@@ -27,6 +27,13 @@ enum ImportJobStatus {
   FAILED
 }
 
+enum AnalysisJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
 model ManagedRepository {
   id          String               @id
   ownerId     String
@@ -55,4 +62,52 @@ model RepositoryImportJob {
   errorMessage String?
 
   @@index([repositoryId, startedAt])
+}
+
+model AnalysisJobRecord {
+  id           String            @id
+  repositoryId String
+  status       AnalysisJobStatus @default(PENDING)
+  progress     Int               @default(0)
+  currentStep  String
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        String?
+  @@index([repositoryId, startedAt])
+}
+
+model CodeFileRecord {
+  id           String   @id
+  repositoryId String
+  path         String
+  extension    String
+  size         Int
+  language     String
+  symbols      CodeSymbolRecord[]
+  @@unique([repositoryId, path])
+  @@index([repositoryId, path])
+}
+
+model CodeSymbolRecord {
+  id           String   @id
+  repositoryId String
+  fileId       String
+  kind         String
+  name         String
+  qualifiedName String
+  line         Int
+  file         CodeFileRecord @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  @@index([repositoryId, kind, name])
+  @@index([repositoryId, fileId])
+}
+
+model CodeRelationshipRecord {
+  id             String @id
+  repositoryId   String
+  sourceSymbolId String
+  targetSymbolId String
+  kind           String
+  confidence     Float
+  @@index([repositoryId, sourceSymbolId])
+  @@index([repositoryId, targetSymbolId])
 }
