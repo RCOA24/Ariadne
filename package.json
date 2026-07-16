@@ -21,6 +21,8 @@
     "@types/yauzl": "^3.4.0",
     "ai": "^4.3.0",
     "cytoscape": "^3.34.0",
+    "framer-motion": "^12.42.2",
+    "lucide-react": "^1.24.0",
     "next": "^15.5.0",
     "react": "^19.1.0",
     "react-cytoscapejs": "^2.0.0",
