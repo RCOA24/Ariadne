@@ -40,9 +40,11 @@ export class ArchitectureInsightService {
     const hotspot = outgoingCounts[0]
       ? await analysisPrisma.codeSymbolRecord.findUnique({
           where: { id: outgoingCounts[0].sourceSymbolId },
-          select: { name: true },
+          select: { qualifiedName: true },
         })
       : undefined;
+    const outgoingRelationshipCount = outgoingCounts[0]?._count._all ?? 0;
+    const hasCouplingSignal = outgoingRelationshipCount >= 25;
     const name = repository?.name;
     const facts = [
       `${symbols.toLocaleString()} symbols mapped`,
@@ -50,7 +52,9 @@ export class ArchitectureInsightService {
       dependencies === 0
         ? "Dependency extraction is not available for this analysis run"
         : hotspot
-          ? `${hotspot.name} has ${outgoingCounts[0]._count._all} outgoing dependencies`
+          ? hasCouplingSignal
+            ? `${hotspot.qualifiedName} has ${outgoingRelationshipCount} verified outgoing relationships and merits a coupling review`
+            : `Most connected mapped symbol: ${hotspot.qualifiedName} (${outgoingRelationshipCount} verified relationships)`
           : "No coupling hotspot detected yet",
     ];
     const fallback = {
@@ -60,9 +64,9 @@ export class ArchitectureInsightService {
       recommendation:
         dependencies === 0
           ? "Re-run analysis after enabling a language plugin with relationship extraction; Ariadne will then calculate coupling and dependency paths."
-          : hotspot
-            ? `Review ${hotspot.name} and its dependencies before coupling increases.`
-            : "Open the Architecture view to inspect the strongest dependency paths.",
+          : hotspot && hasCouplingSignal
+            ? `Inspect the verified relationships around ${hotspot.qualifiedName} in Architecture before prioritizing a coupling change.`
+            : "Open the Architecture view to inspect verified dependency paths and choose the next area to explore.",
     };
     const narrative = this.provider
       ? await this.provider.narrate({ facts })
@@ -75,7 +79,7 @@ export class ArchitectureInsightService {
         { tone: "success", text: facts[0] },
         { tone: "success", text: facts[1] },
         {
-          tone: hotspot && dependencies > 0 ? "warning" : "neutral",
+          tone: hotspot && hasCouplingSignal ? "warning" : "neutral",
           text: facts[2],
         },
       ],

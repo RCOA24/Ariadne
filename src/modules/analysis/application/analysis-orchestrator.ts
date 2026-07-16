@@ -303,13 +303,10 @@ export class AnalysisOrchestrator {
     contents: ReadonlyMap<string, string>,
     symbols: readonly CodeSymbol[],
   ): readonly CodeRelationship[] {
-    const symbolsByFile = new Map<string, readonly CodeSymbol[]>();
     const symbolsByFileAndName = new Map<string, CodeSymbol>();
     const symbolsByName = new Map<string, CodeSymbol[]>();
 
     for (const symbol of symbols) {
-      const fileSymbols = symbolsByFile.get(symbol.fileId) ?? [];
-      symbolsByFile.set(symbol.fileId, [...fileSymbols, symbol]);
       symbolsByFileAndName.set(`${symbol.fileId}:${symbol.name}`, symbol);
       symbolsByName.set(symbol.name, [
         ...(symbolsByName.get(symbol.name) ?? []),
@@ -347,12 +344,10 @@ export class AnalysisOrchestrator {
         ts.ScriptTarget.Latest,
         true,
       );
-      const enclosingSymbols = symbolsByFile.get(file.id) ?? [];
-
-      const resolveUniqueSymbol = (name: string) => {
-        const candidates = symbolsByName.get(name) ?? [];
-        return candidates.length === 1 ? candidates[0] : undefined;
-      };
+      const importedTargets = this.importedTargets(sourceFile, symbolsByName);
+      const resolveTarget = (name: string) =>
+        importedTargets.get(name) ??
+        symbolsByFileAndName.get(`${file.id}:${name}`);
 
       const visit = (node: ts.Node, owner?: CodeSymbol): void => {
         const declarationName =
@@ -384,7 +379,7 @@ export class AnalysisOrchestrator {
                 .at(-1);
               addRelationship(
                 declarationOwner,
-                typeName ? resolveUniqueSymbol(typeName) : undefined,
+                typeName ? resolveTarget(typeName) : undefined,
                 kind,
                 0.98,
               );
@@ -398,28 +393,27 @@ export class AnalysisOrchestrator {
             : undefined;
           addRelationship(
             owner,
-            expressionName ? resolveUniqueSymbol(expressionName) : undefined,
+            expressionName ? resolveTarget(expressionName) : undefined,
             "calls",
-            0.8,
+            0.95,
+          );
+        }
+
+        if (
+          ts.isIdentifier(node) &&
+          owner &&
+          this.isImportedTypeReference(node)
+        ) {
+          addRelationship(
+            owner,
+            importedTargets.get(node.text),
+            "depends-on",
+            0.95,
           );
         }
 
         ts.forEachChild(node, (child) => visit(child, declarationOwner));
       };
-
-      for (const statement of sourceFile.statements) {
-        if (!ts.isImportDeclaration(statement)) continue;
-        const importClause = statement.importClause;
-        if (!importClause) continue;
-
-        const importedNames = this.importedNames(importClause);
-        for (const importedName of importedNames) {
-          const target = resolveUniqueSymbol(importedName);
-          for (const source of enclosingSymbols) {
-            addRelationship(source, target, "depends-on", 0.9);
-          }
-        }
-      }
 
       visit(sourceFile);
     }
@@ -427,19 +421,48 @@ export class AnalysisOrchestrator {
     return Object.freeze([...relationshipById.values()]);
   }
 
-  private importedNames(importClause: ts.ImportClause): readonly string[] {
-    const names = importClause.name ? [importClause.name.text] : [];
-    if (
-      !importClause.namedBindings ||
-      !ts.isNamedImports(importClause.namedBindings)
-    ) {
-      return names;
+  private importedTargets(
+    sourceFile: ts.SourceFile,
+    symbolsByName: ReadonlyMap<string, readonly CodeSymbol[]>,
+  ): ReadonlyMap<string, CodeSymbol> {
+    const targets = new Map<string, CodeSymbol>();
+    const resolveUniqueSymbol = (name: string) => {
+      const candidates = symbolsByName.get(name) ?? [];
+      return candidates.length === 1 ? candidates[0] : undefined;
+    };
+
+    for (const statement of sourceFile.statements) {
+      if (!ts.isImportDeclaration(statement) || !statement.importClause)
+        continue;
+
+      const { importClause } = statement;
+      if (importClause.name) {
+        const target = resolveUniqueSymbol(importClause.name.text);
+        if (target) targets.set(importClause.name.text, target);
+      }
+
+      if (
+        !importClause.namedBindings ||
+        !ts.isNamedImports(importClause.namedBindings)
+      ) {
+        continue;
+      }
+
+      for (const element of importClause.namedBindings.elements) {
+        const exportedName = element.propertyName?.text ?? element.name.text;
+        const target = resolveUniqueSymbol(exportedName);
+        if (target) targets.set(element.name.text, target);
+      }
     }
-    return [
-      ...names,
-      ...importClause.namedBindings.elements.map(
-        (element) => element.propertyName?.text ?? element.name.text,
-      ),
-    ];
+
+    return targets;
+  }
+
+  private isImportedTypeReference(node: ts.Identifier): boolean {
+    const { parent } = node;
+    return (
+      (ts.isTypeReferenceNode(parent) && parent.typeName === node) ||
+      (ts.isExpressionWithTypeArguments(parent) && parent.expression === node)
+    );
   }
 }
