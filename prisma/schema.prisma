@@ -7,5 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Module-owned persistence models are added only when their bounded contexts
-// receive explicit implementation prompts.
+enum RepositorySourceType {
+  GITHUB
+  ZIP_UPLOAD
+  LOCAL_PATH
+}
+
+enum RepositoryStatus {
+  READY
+  ACQUISITION_FAILED
+}
+
+model ManagedRepository {
+  id          String               @id
+  ownerId     String
+  name        String
+  description String?
+  sourceType  RepositorySourceType
+  sourceUrl   String?
+  storagePath String?
+  status      RepositoryStatus     @default(READY)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([ownerId, updatedAt])
+}
