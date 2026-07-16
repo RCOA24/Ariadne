@@ -122,3 +122,47 @@ model SettingsRecord {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 }
+
+enum BackgroundJobType {
+  REPOSITORY_IMPORT
+  CODE_ANALYSIS
+  EMBEDDING_GENERATION
+  ARCHITECTURE_PROCESSING
+}
+
+enum BackgroundJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model BackgroundJobRecord {
+  id          String              @id
+  type        BackgroundJobType
+  status      BackgroundJobStatus @default(PENDING)
+  progress    Int                 @default(0)
+  payload     Json
+  error       String?
+  attempts    Int                 @default(0)
+  maxAttempts Int                 @default(3)
+  workerId    String?
+  lockedAt    DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  completedAt DateTime?
+  logs        BackgroundJobLogRecord[]
+  @@index([status, createdAt])
+  @@index([type, status])
+}
+
+model BackgroundJobLogRecord {
+  id        String   @id
+  jobId     String
+  level     String
+  message   String
+  createdAt DateTime @default(now())
+  job       BackgroundJobRecord @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  @@index([jobId, createdAt])
+}
