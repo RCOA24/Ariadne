@@ -6,7 +6,7 @@ import type { EdgeKindValue, NodeKindValue } from "../types/graph-types";
 import { EdgeKind } from "../value-objects/edge-kind";
 import { EdgeId, GraphId, NodeId, SnapshotId } from "../value-objects/identifiers";
 import type { GraphMetadata } from "../value-objects/graph-metadata";
-import { GraphStatistics } from "../value-objects/graph-statistics";
+import { GraphStatisticsCalculator } from "../services/graph-statistics-calculator";
 import { GraphVersion } from "../value-objects/graph-version";
 import { NodeKind } from "../value-objects/node-kind";
 import { RepositoryGraphValidator } from "../specifications/graph-specifications";
@@ -53,7 +53,7 @@ export class RepositoryGraphFactory {
   }): RepositoryGraph {
     const graph = new RepositoryGraph({
       ...input,
-      statistics: this.statistics(input.nodes, input.edges),
+      statistics: new GraphStatisticsCalculator().calculate(input.nodes, input.edges),
       status: "building"
     });
     const failures = new RepositoryGraphValidator().validate(graph);
@@ -67,13 +67,5 @@ export class RepositoryGraphFactory {
       id: NodeId.fromStableIdentity(input.graphId, input.stableIdentity),
       kind: new NodeKind(input.kind)
     });
-  }
-
-  private statistics(nodes: readonly GraphNode[], edges: readonly GraphEdge[]): GraphStatistics {
-    const nodeCountsByKind: Partial<Record<NodeKindValue, number>> = {};
-    const edgeCountsByKind: Partial<Record<EdgeKindValue, number>> = {};
-    nodes.forEach((node) => { nodeCountsByKind[node.kind.value] = (nodeCountsByKind[node.kind.value] ?? 0) + 1; });
-    edges.forEach((edge) => { edgeCountsByKind[edge.kind.value] = (edgeCountsByKind[edge.kind.value] ?? 0) + 1; });
-    return new GraphStatistics({ nodeCount: nodes.length, edgeCount: edges.length, nodeCountsByKind, edgeCountsByKind });
   }
 }

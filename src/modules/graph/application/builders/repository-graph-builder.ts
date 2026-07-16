@@ -8,6 +8,7 @@ import type { GraphBuilderContext } from "./graph-builder-context";
 import { NodeBuilder } from "./node-builder";
 import { SymbolIndex } from "./symbol-index";
 import { RelationshipResolver } from "../resolution/relationship-resolver";
+import type { ParseResult } from "../../../parser/contracts";
 
 export interface GraphBuildResult {
   readonly graph: RepositoryGraph;
@@ -16,6 +17,15 @@ export interface GraphBuildResult {
 }
 
 export class RepositoryGraphBuilder {
+  public buildFromParserResults(input: Omit<GraphBuilderContext, "files"> & { readonly results: readonly ParseResult[] }): GraphBuildResult {
+    return this.build({
+      ...input,
+      files: input.results
+        .filter((result) => result.status !== "failed" && result.status !== "skipped")
+        .map((result) => ({ repositoryRelativePath: result.sourceFile.repositoryRelativePath, language: result.sourceFile.language.kind, facts: result.facts }))
+    });
+  }
+
   public build(context: GraphBuilderContext): GraphBuildResult {
     const graphId = new GraphId(`${context.repositoryId}:graph:${encodeURIComponent(context.sourceSnapshotIdentity)}`);
     let session = new GraphBuildSession({
