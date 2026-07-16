@@ -58,8 +58,8 @@ export class DashboardService {
       ]);
     const moduleCounts = new Map<string, number>();
     files.forEach((file) => {
-      const module = file.path.split("/")[0] || "root";
-      moduleCounts.set(module, (moduleCounts.get(module) ?? 0) + 1);
+      const moduleName = file.path.split("/")[0] || "root";
+      moduleCounts.set(moduleName, (moduleCounts.get(moduleName) ?? 0) + 1);
     });
     const frameworks = new Map<string, number>();
     repositories.forEach((repository) => {

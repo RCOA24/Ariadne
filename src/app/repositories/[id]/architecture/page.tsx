@@ -1,5 +1,5 @@
 import { ArchitectureVisualization } from "@/components/repositories/architecture-visualization";
-export default async function ArchitecturePage({
+export default async function Page({
   params,
 }: {
   readonly params: Promise<{ id: string }>;

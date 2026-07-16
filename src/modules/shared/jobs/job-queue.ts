@@ -41,8 +41,6 @@ const prisma = globalForPrisma.jobsPrisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== "production") globalForPrisma.jobsPrisma = prisma;
 const typeToDb = (type: JobType): BackgroundJobType =>
   type.toUpperCase().replaceAll("-", "_") as BackgroundJobType;
-const statusToDb = (status: JobStatus): BackgroundJobStatus =>
-  status.toUpperCase() as BackgroundJobStatus;
 const fromDb = (job: {
   id: string;
   type: BackgroundJobType;
