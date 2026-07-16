@@ -81,7 +81,9 @@ export class NodeBuilder {
               exported: declaration.isExported,
               decorators: declaration.decorators,
               comments: declaration.comments,
-              parentName: declaration.parentName ?? ""
+              parentName: declaration.parentName ?? "",
+              extendsNames: declaration.extendsNames ?? [],
+              implementsNames: declaration.implementsNames ?? []
             },
             lineage
           });

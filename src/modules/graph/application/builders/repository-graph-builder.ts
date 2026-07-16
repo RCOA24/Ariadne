@@ -7,6 +7,7 @@ import { GraphBuildSession } from "./graph-build-session";
 import type { GraphBuilderContext } from "./graph-builder-context";
 import { NodeBuilder } from "./node-builder";
 import { SymbolIndex } from "./symbol-index";
+import { RelationshipResolver } from "../resolution/relationship-resolver";
 
 export interface GraphBuildResult {
   readonly graph: RepositoryGraph;
@@ -27,7 +28,9 @@ export class RepositoryGraphBuilder {
       session = session.with({ status: "indexing", nodes: nodes.nodes });
       const symbols = SymbolIndex.from(nodes.nodes);
       session = session.with({ status: "building-edges" });
-      const edges = new EdgeBuilder().build(graphId, nodes);
+      const baseEdges = new EdgeBuilder().build(graphId, nodes);
+      const resolved = new RelationshipResolver().resolve(graphId, nodes.nodes, baseEdges);
+      const edges = resolved.edges;
       const metadata = new GraphMetadata({
         repositoryId: context.repositoryId,
         sourceSnapshotIdentity: context.sourceSnapshotIdentity,

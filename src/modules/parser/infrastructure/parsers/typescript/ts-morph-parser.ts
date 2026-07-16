@@ -118,7 +118,14 @@ export abstract class TsMorphParser implements Parser {
 
   private extractDeclarations(sourceFile: MorphSourceFile, filePath: string): readonly ParsedDeclaration[] {
     const declarations: ParsedDeclaration[] = [];
-    const add = (kind: ParsedDeclaration["kind"], node: Node, name: string, parentName?: string): void => {
+    const add = (
+      kind: ParsedDeclaration["kind"],
+      node: Node,
+      name: string,
+      parentName?: string,
+      extendsNames: readonly string[] = [],
+      implementsNames: readonly string[] = []
+    ): void => {
       declarations.push({
         kind,
         name,
@@ -127,12 +134,16 @@ export abstract class TsMorphParser implements Parser {
         decorators: this.decoratorsOf(node),
         comments: this.commentsOf(node),
         isExported: Node.isExportable(node) && node.isExported(),
-        parentName
+        parentName,
+        extendsNames,
+        implementsNames
       });
     };
 
-    sourceFile.getDescendantsOfKind(SyntaxKind.ClassDeclaration).forEach((node) => add("class", node, node.getName() ?? "<anonymous>"));
-    sourceFile.getDescendantsOfKind(SyntaxKind.InterfaceDeclaration).forEach((node) => add("interface", node, node.getName()));
+    sourceFile.getDescendantsOfKind(SyntaxKind.ClassDeclaration).forEach((node) => {
+      add("class", node, node.getName() ?? "<anonymous>", undefined, node.getExtends() === undefined ? [] : [node.getExtends()!.getText()], node.getImplements().map((item) => item.getText()));
+    });
+    sourceFile.getDescendantsOfKind(SyntaxKind.InterfaceDeclaration).forEach((node) => add("interface", node, node.getName(), undefined, node.getExtends().map((item) => item.getText())));
     sourceFile.getDescendantsOfKind(SyntaxKind.FunctionDeclaration).forEach((node) => add("function", node, node.getName() ?? "<anonymous>"));
     sourceFile.getDescendantsOfKind(SyntaxKind.MethodDeclaration).forEach((node) => {
       const parentName = node.getFirstAncestorByKind(SyntaxKind.ClassDeclaration)?.getName()

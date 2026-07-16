@@ -5,3 +5,8 @@ export * from "./builders/graph-build-session";
 export * from "./builders/node-builder";
 export * from "./builders/repository-graph-builder";
 export * from "./builders/symbol-index";
+export * from "./resolution/module-resolver";
+export * from "./resolution/namespace-resolver";
+export * from "./resolution/qualified-name-resolver";
+export * from "./resolution/relationship-resolver";
+export * from "./resolution/symbol-table";

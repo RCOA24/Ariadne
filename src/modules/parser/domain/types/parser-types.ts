@@ -48,6 +48,8 @@ export interface ParsedDeclaration {
   readonly comments: readonly string[];
   readonly isExported: boolean;
   readonly parentName?: string;
+  readonly extendsNames?: readonly string[];
+  readonly implementsNames?: readonly string[];
 }
 
 export interface ParseDiagnostic {
