@@ -33,13 +33,25 @@ export function RepositoryDetails({ id }: { readonly id: string }) {
   }, [id]);
   const startImport = async () => {
     setError(undefined);
+    setJob({
+      status: "running",
+      currentStep: "Importing repository and building software knowledge",
+      progress: 5,
+    });
     const response = await fetch(`/api/repositories/${id}/import`, {
       method: "POST",
       headers: { "x-ariadne-owner-id": "local-development" },
     });
     const result = await response.json();
-    if (!response.ok) setError(result.error);
-    else setJob(result);
+    if (!response.ok) {
+      setError(result.error ?? result.import?.errorMessage ?? "Import failed.");
+      setJob({
+        status: "failed",
+        currentStep: "Import failed",
+        progress: 0,
+        errorMessage: result.error,
+      });
+    } else setJob(result.analysis ?? result.import);
   };
   if (error)
     return (
@@ -106,7 +118,7 @@ export function RepositoryDetails({ id }: { readonly id: string }) {
               onClick={() => void startImport()}
               className="mt-4 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950"
             >
-              Start import
+              Import and analyze repository
             </button>
           </>
         )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useNotifications } from "@/components/ui/notifications";
 
 type Repository = {
   id: string;
@@ -23,7 +24,9 @@ const request = (path: string, init?: RequestInit) =>
 export function RepositoryDashboard() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const [githubBusy, setGithubBusy] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const { notify } = useNotifications();
   const load = async () => {
     const response = await request("/api/repositories");
     if (response.ok) setRepositories(await response.json());
@@ -33,8 +36,9 @@ export function RepositoryDashboard() {
   }, []);
   const addGitHub = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    setBusy(true);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setGithubBusy(true);
     setError(undefined);
     const response = await request("/api/repositories", {
       method: "POST",
@@ -47,28 +51,31 @@ export function RepositoryDashboard() {
         name: data.get("name") || undefined,
       }),
     });
-    setBusy(false);
+    setGithubBusy(false);
     if (!response.ok) {
       setError((await response.json()).error);
       return;
     }
-    event.currentTarget.reset();
+    form.reset();
+    notify({ tone: "success", title: "Repository cloned", message: "Ready to import and analyze." });
     await load();
   };
   const upload = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setBusy(true);
+    const form = event.currentTarget;
+    setUploadBusy(true);
     setError(undefined);
     const response = await request("/api/repositories/upload", {
       method: "POST",
-      body: new FormData(event.currentTarget),
+      body: new FormData(form),
     });
-    setBusy(false);
+    setUploadBusy(false);
     if (!response.ok) {
       setError((await response.json()).error);
       return;
     }
-    event.currentTarget.reset();
+    form.reset();
+    notify({ tone: "success", title: "Archive uploaded", message: "Ready to import and analyze." });
     await load();
   };
   const remove = async (id: string) => {
@@ -117,10 +124,10 @@ export function RepositoryDashboard() {
             className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-400 focus:ring"
           />
           <button
-            disabled={busy}
+            disabled={githubBusy}
             className="mt-4 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
           >
-            {busy ? "Acquiring…" : "Clone repository"}
+            {githubBusy ? "Cloning repository…" : "Clone repository"}
           </button>
         </form>
         <form
@@ -144,10 +151,10 @@ export function RepositoryDashboard() {
             className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-400 focus:ring"
           />
           <button
-            disabled={busy}
+            disabled={uploadBusy}
             className="mt-4 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
           >
-            {busy ? "Uploading…" : "Upload archive"}
+            {uploadBusy ? "Uploading archive…" : "Upload archive"}
           </button>
         </form>
       </section>
