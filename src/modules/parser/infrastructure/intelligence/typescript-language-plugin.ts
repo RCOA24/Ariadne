@@ -116,6 +116,9 @@ export class TypeScriptLanguagePlugin implements ILanguagePlugin {
     _repositoryId: string,
     _symbols: readonly CodeSymbol[],
   ): Promise<readonly CodeRelationship[]> {
+    void _ast;
+    void _repositoryId;
+    void _symbols;
     return Object.freeze([]);
   }
   public async calculateMetrics(ast: UniversalAST): Promise<FileMetrics> {

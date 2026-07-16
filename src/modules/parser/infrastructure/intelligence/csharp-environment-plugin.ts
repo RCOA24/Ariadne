@@ -16,6 +16,7 @@ export class CSharpEnvironmentPlugin implements ILanguagePlugin {
     return project.files.some((file) => file.endsWith(".cs"));
   }
   public async parse(_file: LanguageSourceFile): Promise<UniversalAST> {
+    void _file;
     throw new Error(
       "C# parsing is environment-unavailable: install the Node-compatible Tree-sitter C# adapter.",
     );

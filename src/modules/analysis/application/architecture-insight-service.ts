@@ -19,35 +19,50 @@ export interface GroundedNarrativeProvider {
 export class ArchitectureInsightService {
   public constructor(private readonly provider?: GroundedNarrativeProvider) {}
   public async getToday(): Promise<ArchitectureInsight> {
-    const [repository, symbols, dependencies, hotspots] = await Promise.all([
-      analysisPrisma.managedRepository.findFirst({
-        where: { status: "READY" },
-        orderBy: { importedAt: "desc" },
-      }),
-      analysisPrisma.codeSymbolRecord.count(),
-      analysisPrisma.codeRelationshipRecord.count(),
-      analysisPrisma.codeSymbolRecord.groupBy({
-        by: ["name"],
+    const repository = await analysisPrisma.managedRepository.findFirst({
+      where: { status: "READY" },
+      orderBy: { importedAt: "desc" },
+    });
+    const repositoryScope = repository
+      ? { repositoryId: repository.id }
+      : undefined;
+    const [symbols, dependencies, outgoingCounts] = await Promise.all([
+      analysisPrisma.codeSymbolRecord.count({ where: repositoryScope }),
+      analysisPrisma.codeRelationshipRecord.count({ where: repositoryScope }),
+      analysisPrisma.codeRelationshipRecord.groupBy({
+        where: repositoryScope,
+        by: ["sourceSymbolId"],
         _count: { _all: true },
-        orderBy: { _count: { name: "desc" } },
+        orderBy: { _count: { sourceSymbolId: "desc" } },
         take: 1,
       }),
     ]);
+    const hotspot = outgoingCounts[0]
+      ? await analysisPrisma.codeSymbolRecord.findUnique({
+          where: { id: outgoingCounts[0].sourceSymbolId },
+          select: { name: true },
+        })
+      : undefined;
     const name = repository?.name;
     const facts = [
       `${symbols.toLocaleString()} symbols mapped`,
       `${dependencies.toLocaleString()} dependencies discovered`,
-      hotspots[0]
-        ? `${hotspots[0].name} appears in ${hotspots[0]._count._all} mapped symbol records`
-        : "No coupling hotspot detected yet",
+      dependencies === 0
+        ? "Dependency extraction is not available for this analysis run"
+        : hotspot
+          ? `${hotspot.name} has ${outgoingCounts[0]._count._all} outgoing dependencies`
+          : "No coupling hotspot detected yet",
     ];
     const fallback = {
       summary: name
         ? `Ariadne analyzed ${name}. The architecture is mapped and ready for guided exploration.`
         : "Import and analyze a repository to receive a grounded architecture briefing.",
-      recommendation: hotspots[0]
-        ? `Review ${hotspots[0].name} and its dependencies before coupling increases.`
-        : "Open the Architecture view to inspect the strongest dependency paths.",
+      recommendation:
+        dependencies === 0
+          ? "Re-run analysis after enabling a language plugin with relationship extraction; Ariadne will then calculate coupling and dependency paths."
+          : hotspot
+            ? `Review ${hotspot.name} and its dependencies before coupling increases.`
+            : "Open the Architecture view to inspect the strongest dependency paths.",
     };
     const narrative = this.provider
       ? await this.provider.narrate({ facts })
@@ -59,7 +74,10 @@ export class ArchitectureInsightService {
       highlights: [
         { tone: "success", text: facts[0] },
         { tone: "success", text: facts[1] },
-        { tone: hotspots[0] ? "warning" : "neutral", text: facts[2] },
+        {
+          tone: hotspot && dependencies > 0 ? "warning" : "neutral",
+          text: facts[2],
+        },
       ],
       recommendation: narrative.recommendation,
       evidence: facts,
