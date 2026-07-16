@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GraphVersion } from "../../../domain/value-objects/graph-version";
+import { RepositoryGraphIndexes } from "../../indexes/repository-graph-indexes";
 import { GraphBuilderPipeline } from "../graph-builder-pipeline";
 
 describe("GraphBuilderPipeline", () => {
@@ -33,6 +34,13 @@ describe("GraphBuilderPipeline", () => {
     expect(first.graph.edges.map((edge) => edge.kind.value)).toEqual(expect.arrayContaining(["owns", "imports", "exports", "depends-on"]));
     expect(first.graph.nodes.map((node) => node.id.value)).toEqual(second.graph.nodes.map((node) => node.id.value));
     expect(first.symbols.findByQualifiedName("src/payment.ts::PaymentService")?.name).toBe("PaymentService");
+    const indexes = new RepositoryGraphIndexes(first.graph);
+    const service = first.symbols.findByQualifiedName("src/payment.ts::PaymentService");
+    expect(service).toBeDefined();
+    expect(indexes.nodes.get(service!.id.value)).toBe(service);
+    expect(indexes.qualifiedNames.find(service!.qualifiedName)).toContain(service);
+    expect(indexes.sourceLocations.inFile("src/payment.ts").some((reference) => reference.id === service!.id.value)).toBe(true);
+    expect(indexes.ownership.ownerOf(service!.id.value)).toBeDefined();
   });
 
   it("resolves module imports, symbol references, inheritance, and implementations", () => {
