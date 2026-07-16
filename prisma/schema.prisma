@@ -14,8 +14,17 @@ enum RepositorySourceType {
 }
 
 enum RepositoryStatus {
+  PENDING_IMPORT
+  IMPORTING
   READY
-  ACQUISITION_FAILED
+  IMPORT_FAILED
+}
+
+enum ImportJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 model ManagedRepository {
@@ -26,9 +35,24 @@ model ManagedRepository {
   sourceType  RepositorySourceType
   sourceUrl   String?
   storagePath String?
-  status      RepositoryStatus     @default(READY)
+  status      RepositoryStatus     @default(PENDING_IMPORT)
+  metadata    Json?
+  importedAt  DateTime?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
 
   @@index([ownerId, updatedAt])
+}
+
+model RepositoryImportJob {
+  id           String          @id
+  repositoryId String
+  status       ImportJobStatus @default(PENDING)
+  currentStep  String          @default("Import requested")
+  progress     Int             @default(0)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+
+  @@index([repositoryId, startedAt])
 }

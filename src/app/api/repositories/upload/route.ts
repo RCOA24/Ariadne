@@ -1,5 +1,51 @@
 import { NextResponse } from "next/server";
-import { managementService, ownerIdFrom } from "@/modules/repository/api/repository-api";
+import {
+  managementService,
+  ownerIdFrom,
+} from "@/modules/repository/api/repository-api";
 
 export const runtime = "nodejs";
-export async function POST(request: Request) { try { const form = await request.formData(); const archive = form.get("archive"); if (!(archive instanceof File)) return NextResponse.json({ error: "A ZIP archive is required." }, { status: 400 }); if (archive.size > 100 * 1024 * 1024) return NextResponse.json({ error: "ZIP archives are limited to 100 MB." }, { status: 413 }); const name = typeof form.get("name") === "string" ? String(form.get("name")) : undefined; const description = typeof form.get("description") === "string" ? String(form.get("description")) : undefined; const repository = await managementService().createFromZip(ownerIdFrom(request), { name, description, fileName: archive.name, contents: new Uint8Array(await archive.arrayBuffer()) }); return NextResponse.json(repository, { status: 201 }); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Archive could not be uploaded." }, { status: 422 }); } }
+export async function POST(request: Request) {
+  try {
+    const form = await request.formData();
+    const archive = form.get("archive");
+    if (!(archive instanceof File))
+      return NextResponse.json(
+        { error: "A ZIP archive is required." },
+        { status: 400 },
+      );
+    if (archive.size > 100 * 1024 * 1024)
+      return NextResponse.json(
+        { error: "ZIP archives are limited to 100 MB." },
+        { status: 413 },
+      );
+    const name =
+      typeof form.get("name") === "string"
+        ? String(form.get("name"))
+        : undefined;
+    const description =
+      typeof form.get("description") === "string"
+        ? String(form.get("description"))
+        : undefined;
+    const repository = await managementService().createFromZip(
+      ownerIdFrom(request),
+      {
+        name,
+        description,
+        fileName: archive.name,
+        contents: new Uint8Array(await archive.arrayBuffer()),
+      },
+    );
+    return NextResponse.json(repository, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Archive could not be uploaded.",
+      },
+      { status: 422 },
+    );
+  }
+}

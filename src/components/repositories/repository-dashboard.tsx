@@ -2,19 +2,206 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-type Repository = { id: string; name: string; description?: string; sourceType: string; sourceLocation: string; status: string; updatedAt: string };
-const request = (path: string, init?: RequestInit) => fetch(path, { ...init, headers: { "x-ariadne-owner-id": "local-development", ...(init?.headers ?? {}) } });
+type Repository = {
+  id: string;
+  name: string;
+  description?: string;
+  sourceType: string;
+  sourceLocation: string;
+  status: string;
+  updatedAt: string;
+};
+const request = (path: string, init?: RequestInit) =>
+  fetch(path, {
+    ...init,
+    headers: {
+      "x-ariadne-owner-id": "local-development",
+      ...(init?.headers ?? {}),
+    },
+  });
 
 export function RepositoryDashboard() {
-  const [repositories, setRepositories] = useState<Repository[]>([]); const [error, setError] = useState<string>(); const [busy, setBusy] = useState(false);
-  const load = async () => { const response = await request("/api/repositories"); if (response.ok) setRepositories(await response.json()); };
-  useEffect(() => { void load(); }, []);
-  const addGitHub = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); setBusy(true); setError(undefined); const response = await request("/api/repositories", { method: "POST", headers: { "content-type": "application/json", "x-ariadne-owner-id": "local-development" }, body: JSON.stringify({ githubUrl: data.get("githubUrl"), name: data.get("name") || undefined }) }); setBusy(false); if (!response.ok) { setError((await response.json()).error); return; } event.currentTarget.reset(); await load(); };
-  const upload = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setBusy(true); setError(undefined); const response = await request("/api/repositories/upload", { method: "POST", body: new FormData(event.currentTarget) }); setBusy(false); if (!response.ok) { setError((await response.json()).error); return; } event.currentTarget.reset(); await load(); };
-  const remove = async (id: string) => { if (!confirm("Delete this repository and its acquired workspace?")) return; const response = await request(`/api/repositories/${id}`, { method: "DELETE" }); if (response.ok) await load(); };
-  return <main className="mx-auto min-h-screen max-w-6xl px-6 py-12"><header className="mb-12 flex items-start justify-between gap-6"><div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Ariadne</p><h1 className="text-4xl font-semibold text-white">Repositories</h1><p className="mt-3 max-w-xl text-slate-400">Add a public GitHub repository or upload a ZIP archive. Analysis begins only when you choose it later.</p></div><span className="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-400">Management</span></header>
-    <section className="grid gap-5 lg:grid-cols-2"><form onSubmit={addGitHub} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6"><h2 className="text-lg font-medium text-white">Clone from GitHub</h2><p className="mt-1 text-sm text-slate-400">Public HTTPS repositories only.</p><input required name="githubUrl" type="url" placeholder="https://github.com/owner/repository" className="mt-5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-400 focus:ring"/><input name="name" placeholder="Display name (optional)" className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-400 focus:ring"/><button disabled={busy} className="mt-4 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy ? "Acquiring…" : "Clone repository"}</button></form>
-    <form onSubmit={upload} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6"><h2 className="text-lg font-medium text-white">Upload ZIP</h2><p className="mt-1 text-sm text-slate-400">ZIP archives up to 100 MB. They are stored only; no analysis runs.</p><input required name="archive" type="file" accept=".zip,application/zip" className="mt-5 block w-full text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-200"/><input name="name" placeholder="Display name (optional)" className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-400 focus:ring"/><button disabled={busy} className="mt-4 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy ? "Uploading…" : "Upload archive"}</button></form></section>
-    {error && <p className="mt-5 rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">{error}</p>}
-    <section className="mt-12"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-medium text-white">Recent repositories</h2><span className="text-sm text-slate-500">{repositories.length} saved</span></div><div className="overflow-hidden rounded-2xl border border-slate-800">{repositories.length === 0 ? <p className="p-8 text-sm text-slate-500">No repositories yet. Add one to begin.</p> : repositories.map((repository) => <div key={repository.id} className="flex items-center justify-between gap-5 border-b border-slate-800 p-5 last:border-0"><div><a href={`/repositories/${repository.id}`} className="font-medium text-cyan-300 hover:text-cyan-200">{repository.name}</a><p className="mt-1 max-w-xl truncate text-sm text-slate-500">{repository.sourceLocation}</p><p className="mt-1 text-xs uppercase tracking-wider text-slate-600">{repository.sourceType.replace("-", " ")} · Updated {new Date(repository.updatedAt).toLocaleDateString()}</p></div><button onClick={() => void remove(repository.id)} className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-rose-700 hover:text-rose-300">Delete</button></div>)}</div></section></main>;
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    const response = await request("/api/repositories");
+    if (response.ok) setRepositories(await response.json());
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+  const addGitHub = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setBusy(true);
+    setError(undefined);
+    const response = await request("/api/repositories", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ariadne-owner-id": "local-development",
+      },
+      body: JSON.stringify({
+        githubUrl: data.get("githubUrl"),
+        name: data.get("name") || undefined,
+      }),
+    });
+    setBusy(false);
+    if (!response.ok) {
+      setError((await response.json()).error);
+      return;
+    }
+    event.currentTarget.reset();
+    await load();
+  };
+  const upload = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(undefined);
+    const response = await request("/api/repositories/upload", {
+      method: "POST",
+      body: new FormData(event.currentTarget),
+    });
+    setBusy(false);
+    if (!response.ok) {
+      setError((await response.json()).error);
+      return;
+    }
+    event.currentTarget.reset();
+    await load();
+  };
+  const remove = async (id: string) => {
+    if (!confirm("Delete this repository and its acquired workspace?")) return;
+    const response = await request(`/api/repositories/${id}`, {
+      method: "DELETE",
+    });
+    if (response.ok) await load();
+  };
+  return (
+    <main className="mx-auto min-h-screen max-w-6xl px-6 py-12">
+      <header className="mb-12 flex items-start justify-between gap-6">
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+            Ariadne
+          </p>
+          <h1 className="text-4xl font-semibold text-white">Repositories</h1>
+          <p className="mt-3 max-w-xl text-slate-400">
+            Add a public GitHub repository or upload a ZIP archive. Analysis
+            begins only when you choose it later.
+          </p>
+        </div>
+        <span className="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-400">
+          Management
+        </span>
+      </header>
+      <section className="grid gap-5 lg:grid-cols-2">
+        <form
+          onSubmit={addGitHub}
+          className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6"
+        >
+          <h2 className="text-lg font-medium text-white">Clone from GitHub</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Public HTTPS repositories only.
+          </p>
+          <input
+            required
+            name="githubUrl"
+            type="url"
+            placeholder="https://github.com/owner/repository"
+            className="mt-5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-400 focus:ring"
+          />
+          <input
+            name="name"
+            placeholder="Display name (optional)"
+            className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-400 focus:ring"
+          />
+          <button
+            disabled={busy}
+            className="mt-4 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+          >
+            {busy ? "Acquiring…" : "Clone repository"}
+          </button>
+        </form>
+        <form
+          onSubmit={upload}
+          className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6"
+        >
+          <h2 className="text-lg font-medium text-white">Upload ZIP</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            ZIP archives up to 100 MB. They are stored only; no analysis runs.
+          </p>
+          <input
+            required
+            name="archive"
+            type="file"
+            accept=".zip,application/zip"
+            className="mt-5 block w-full text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-200"
+          />
+          <input
+            name="name"
+            placeholder="Display name (optional)"
+            className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-400 focus:ring"
+          />
+          <button
+            disabled={busy}
+            className="mt-4 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+          >
+            {busy ? "Uploading…" : "Upload archive"}
+          </button>
+        </form>
+      </section>
+      {error && (
+        <p className="mt-5 rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+          {error}
+        </p>
+      )}
+      <section className="mt-12">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-medium text-white">
+            Recent repositories
+          </h2>
+          <span className="text-sm text-slate-500">
+            {repositories.length} saved
+          </span>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-800">
+          {repositories.length === 0 ? (
+            <p className="p-8 text-sm text-slate-500">
+              No repositories yet. Add one to begin.
+            </p>
+          ) : (
+            repositories.map((repository) => (
+              <div
+                key={repository.id}
+                className="flex items-center justify-between gap-5 border-b border-slate-800 p-5 last:border-0"
+              >
+                <div>
+                  <a
+                    href={`/repositories/${repository.id}`}
+                    className="font-medium text-cyan-300 hover:text-cyan-200"
+                  >
+                    {repository.name}
+                  </a>
+                  <p className="mt-1 max-w-xl truncate text-sm text-slate-500">
+                    {repository.sourceLocation}
+                  </p>
+                  <p className="mt-1 text-xs uppercase tracking-wider text-slate-600">
+                    {repository.sourceType.replace("-", " ")} · Updated{" "}
+                    {new Date(repository.updatedAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => void remove(repository.id)}
+                  className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-rose-700 hover:text-rose-300"
+                >
+                  Delete
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+    </main>
+  );
 }
