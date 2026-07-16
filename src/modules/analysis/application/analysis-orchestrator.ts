@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { extname, relative, resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { RepositoryScanner, type RepositoryFile } from "../../repository/application/services/repository-import-service";
 import type { CodeFile, CodeRelationship, CodeSymbol } from "../domain/entities/code-knowledge";
 import { AnalysisJob } from "../domain/entities/analysis-job";

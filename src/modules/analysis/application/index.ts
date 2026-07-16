@@ -2,3 +2,4 @@ export * from "./analysis-engine";
 export * from "./services/analysis-services";
 export * from "./analysis-orchestrator";
 export * from "./knowledge-query-service";
+export * from "./architecture-visualization-analyzer";
