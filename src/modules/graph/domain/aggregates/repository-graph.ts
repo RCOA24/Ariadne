@@ -1,6 +1,6 @@
 import type { GraphEdge } from "../entities/graph-edge";
 import type { GraphNode } from "../entities/graph-node";
-import { RepositoryGraphValidator } from "../specifications/graph-specifications";
+import { GraphValidator } from "../services/graph-validator";
 import type { GraphStatus } from "../types/graph-types";
 import type { GraphId } from "../value-objects/identifiers";
 import type { GraphMetadata } from "../value-objects/graph-metadata";
@@ -42,8 +42,8 @@ export class RepositoryGraph {
   }
 
   public publish(): RepositoryGraph {
-    const failures = new RepositoryGraphValidator().validate(this);
-    if (failures.length > 0) throw new Error(failures.map((failure) => failure.message).join(" "));
+    const validation = new GraphValidator().validate(this);
+    if (!validation.isValid) throw new Error(validation.failures.map((failure) => failure.message).join(" "));
     return new RepositoryGraph({ ...this, status: "published" });
   }
 }

@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   EdgeKind,
   EdgeId,
+  CycleDetector,
   GraphEdge,
   GraphId,
   GraphMetadata,
+  GraphNode,
   GraphSnapshotFactory,
+  GraphValidator,
   GraphVersion,
   NodeId,
+  NodeKind,
   RepositoryEdgeFactory,
   RepositoryGraphFactory,
   RepositoryNodeFactory
@@ -39,6 +43,7 @@ describe("RepositoryGraph", () => {
 
     expect(graph.publish().status).toBe("published");
     expect(Object.isFrozen(graph.nodes)).toBe(true);
+    expect(new GraphValidator().validate(graph).isValid).toBe(true);
   });
 
   it("rejects ownership cycles", () => {
@@ -68,5 +73,16 @@ describe("RepositoryGraph", () => {
     const snapshot = new GraphSnapshotFactory().create({ graphId, sourceSnapshotIdentity: "source-1", version, createdAt: metadata.createdAt });
 
     expect(() => new RepositoryGraphFactory().createBuilding({ id: graphId, snapshot, metadata, nodes: [repository, folder], edges })).toThrow("acyclic");
+  });
+
+  it("detects non-ownership relationship cycles without treating them as integrity failures", () => {
+    const left = new GraphNode({ id: NodeId.fromStableIdentity(graphId, "left"), graphId, stableIdentity: "left", kind: new NodeKind("class"), name: "Left", qualifiedName: "Left", sourceLocations: [], lineage });
+    const right = new GraphNode({ id: NodeId.fromStableIdentity(graphId, "right"), graphId, stableIdentity: "right", kind: new NodeKind("class"), name: "Right", qualifiedName: "Right", sourceLocations: [], lineage });
+    const edges = [
+      new GraphEdge({ id: EdgeId.fromStableIdentity(graphId, "left-right"), sourceNodeId: left.id, targetNodeId: right.id, kind: new EdgeKind("depends-on"), confidence: "confirmed", evidence: [] }),
+      new GraphEdge({ id: EdgeId.fromStableIdentity(graphId, "right-left"), sourceNodeId: right.id, targetNodeId: left.id, kind: new EdgeKind("depends-on"), confidence: "confirmed", evidence: [] })
+    ];
+
+    expect(new CycleDetector().detect([left, right], edges)).toHaveLength(1);
   });
 });

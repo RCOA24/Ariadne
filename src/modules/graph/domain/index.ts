@@ -6,6 +6,8 @@ export * from "./events/graph-events";
 export * from "./factories/graph-factories";
 export * from "./repositories/repository-graph-repository";
 export * from "./specifications/graph-specifications";
+export * from "./services/cycle-detector";
+export * from "./services/graph-validator";
 export * from "./types/graph-types";
 export * from "./value-objects/edge-kind";
 export * from "./value-objects/graph-metadata";
