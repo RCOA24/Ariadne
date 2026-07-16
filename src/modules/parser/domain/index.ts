@@ -10,3 +10,5 @@ export * from "./services/parse-session-progress-service";
 export * from "./types/parser-types";
 export * from "./value-objects/language";
 export * from "./value-objects/source-snapshot";
+export * from "./intelligence/universal-ast";
+export * from "./intelligence/language-plugin";

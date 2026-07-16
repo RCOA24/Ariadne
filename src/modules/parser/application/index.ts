@@ -8,5 +8,6 @@ export * from "./handlers/get-parse-progress-handler";
 export * from "./handlers/parse-file-handler";
 export * from "./handlers/parse-repository-handler";
 export * from "./handlers/start-parse-session-handler";
+export * from "./intelligence/parser-registry";
 export * from "./interfaces/parser-application-dependencies";
 export * from "./queries/get-parse-progress";
