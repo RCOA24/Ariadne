@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GraphVersion } from "../../../domain/value-objects/graph-version";
 import { RepositoryGraphIndexes } from "../../indexes/repository-graph-indexes";
+import { DependencyTraversal } from "../../traversal/dependency-traversal";
+import { GraphTraversal } from "../../traversal/graph-traversal";
+import { OwnershipTraversal } from "../../traversal/ownership-traversal";
 import { GraphBuilderPipeline } from "../graph-builder-pipeline";
 
 describe("GraphBuilderPipeline", () => {
@@ -41,6 +44,13 @@ describe("GraphBuilderPipeline", () => {
     expect(indexes.qualifiedNames.find(service!.qualifiedName)).toContain(service);
     expect(indexes.sourceLocations.inFile("src/payment.ts").some((reference) => reference.id === service!.id.value)).toBe(true);
     expect(indexes.ownership.ownerOf(service!.id.value)).toBeDefined();
+    const repository = first.graph.nodes.find((node) => node.kind.value === "repository");
+    const importNode = first.graph.nodes.find((node) => node.kind.value === "import");
+    expect(repository).toBeDefined();
+    expect(importNode).toBeDefined();
+    expect(new GraphTraversal(indexes).breadthFirst(repository!.id.value, { edgeKinds: ["owns"] }).nodeIds).toContain(service!.id.value);
+    expect(new OwnershipTraversal(indexes).ancestorsOf(service!.id.value)).toContain(repository!.id.value);
+    expect(new DependencyTraversal(indexes).dependenciesOf(importNode!.id.value)).toHaveLength(1);
   });
 
   it("resolves module imports, symbol references, inheritance, and implementations", () => {

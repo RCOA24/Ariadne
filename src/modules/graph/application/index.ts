@@ -18,3 +18,6 @@ export * from "./indexes/qualified-name-index";
 export * from "./indexes/repository-graph-indexes";
 export * from "./indexes/reverse-edge-index";
 export * from "./indexes/source-location-index";
+export * from "./traversal/dependency-traversal";
+export * from "./traversal/graph-traversal";
+export * from "./traversal/ownership-traversal";
