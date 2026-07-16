@@ -1,2 +1,4 @@
-import { RepositoryDashboard } from "@/components/repositories/repository-dashboard";
-export default function HomePage() { return <RepositoryDashboard />; }
+import { AriadneDashboard } from "@/components/dashboard/ariadne-dashboard";
+export default function HomePage() {
+  return <AriadneDashboard />;
+}
