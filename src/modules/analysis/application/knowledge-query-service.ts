@@ -12,9 +12,10 @@ export class KnowledgeQueryService {
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    const next = files.length > limit ? files.pop()!.id : undefined;
+    const items = files.slice(0, limit);
+    const next = files.length > limit ? items.at(-1)?.id : undefined;
     return {
-      items: files.map((file) => ({
+      items: items.map((file) => ({
         ...file,
         folders: file.path.split("/").slice(0, -1),
       })),
@@ -59,8 +60,9 @@ export class KnowledgeQueryService {
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    const next = rows.length > limit ? rows.pop()!.id : undefined;
-    return { items: rows, nextCursor: next };
+    const items = rows.slice(0, limit);
+    const next = rows.length > limit ? items.at(-1)?.id : undefined;
+    return { items, nextCursor: next };
   }
   public async getSymbols(
     repositoryId: string,
@@ -74,7 +76,8 @@ export class KnowledgeQueryService {
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    const next = rows.length > limit ? rows.pop()!.id : undefined;
-    return { items: rows, nextCursor: next };
+    const items = rows.slice(0, limit);
+    const next = rows.length > limit ? items.at(-1)?.id : undefined;
+    return { items, nextCursor: next };
   }
 }

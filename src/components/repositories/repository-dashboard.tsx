@@ -26,7 +26,8 @@ export function RepositoryDashboard() {
   const [error, setError] = useState<string>();
   const [githubBusy, setGithubBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
-  const { notify } = useNotifications();
+  const [deletingId, setDeletingId] = useState<string>();
+  const { confirm, notify } = useNotifications();
   const load = async () => {
     const response = await request("/api/repositories");
     if (response.ok) setRepositories(await response.json());
@@ -57,7 +58,11 @@ export function RepositoryDashboard() {
       return;
     }
     form.reset();
-    notify({ tone: "success", title: "Repository cloned", message: "Ready to import and analyze." });
+    notify({
+      tone: "success",
+      title: "Repository cloned",
+      message: "Ready to import and analyze.",
+    });
     await load();
   };
   const upload = async (event: FormEvent<HTMLFormElement>) => {
@@ -75,15 +80,44 @@ export function RepositoryDashboard() {
       return;
     }
     form.reset();
-    notify({ tone: "success", title: "Archive uploaded", message: "Ready to import and analyze." });
+    notify({
+      tone: "success",
+      title: "Archive uploaded",
+      message: "Ready to import and analyze.",
+    });
     await load();
   };
   const remove = async (id: string) => {
-    if (!confirm("Delete this repository and its acquired workspace?")) return;
-    const response = await request(`/api/repositories/${id}`, {
-      method: "DELETE",
+    const approved = await confirm({
+      title: "Delete this repository?",
+      message:
+        "This permanently removes the repository record, its acquired workspace, and all generated analysis data.",
+      confirmLabel: "Delete repository",
     });
-    if (response.ok) await load();
+    if (!approved) return;
+
+    setDeletingId(id);
+    try {
+      const response = await request(`/api/repositories/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        notify({
+          tone: "error",
+          title: "Repository could not be deleted",
+          message: (await response.json()).error ?? "Please try again.",
+        });
+        return;
+      }
+      notify({
+        tone: "success",
+        title: "Repository deleted",
+        message: "Its workspace and generated knowledge were removed.",
+      });
+      await load();
+    } finally {
+      setDeletingId(undefined);
+    }
   };
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-12">
@@ -200,9 +234,10 @@ export function RepositoryDashboard() {
                 </div>
                 <button
                   onClick={() => void remove(repository.id)}
+                  disabled={deletingId === repository.id}
                   className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-rose-700 hover:text-rose-300"
                 >
-                  Delete
+                  {deletingId === repository.id ? "Deleting…" : "Delete"}
                 </button>
               </div>
             ))
