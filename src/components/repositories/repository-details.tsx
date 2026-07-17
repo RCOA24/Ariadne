@@ -45,13 +45,46 @@ export function RepositoryDetails({ id }: { readonly id: string }) {
   const [overview, setOverview] = useState<Overview>();
   const [error, setError] = useState<string>();
   useEffect(() => {
-    fetch(`/api/repositories/${id}/overview`).then(async (response) => response.ok ? setOverview(await response.json()) : setError("Repository could not be loaded.")).catch(() => setError("Repository could not be loaded."));
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/repositories/${id}/overview`, { cache: "no-store" });
+        if (!response.ok) throw new Error("Repository could not be loaded.");
+        const next = await response.json() as Overview;
+        if (stopped) return;
+        setOverview(next); setError(undefined);
+        const analyzing = next.status === "IMPORTING" || next.status === "PENDING_IMPORT" || next.analysisStatus === "RUNNING" || next.analysisStatus === "PENDING";
+        if (analyzing) timer = setTimeout(() => void load(), 1500);
+      } catch {
+        if (!stopped) setError("Repository could not be loaded.");
+      }
+    };
+    void load();
+    return () => { stopped = true; if (timer) clearTimeout(timer); };
   }, [id]);
   if (error) return <p className="py-16 text-rose-300">{error}</p>;
   if (!overview) return <OverviewSkeleton />;
   const analyzing = overview.status === "IMPORTING" || overview.status === "PENDING_IMPORT" || overview.analysisStatus === "RUNNING" || overview.analysisStatus === "PENDING";
-  if (analyzing) return <AnalysisPending id={id} name={overview.name} />;
+  // Fast index makes files and the repository map useful before deep analysis
+  // completes. Keep the skeleton only until that first usable checkpoint.
+  if (overview.status === "PENDING_IMPORT") return <ImportPending id={id} name={overview.name} />;
+  if (overview.analysisStatus === "FAILED") return <ImportPending id={id} name={overview.name} retry />;
+  if (analyzing && !Number(overview.metrics["Total files"])) return <AnalysisPending id={id} name={overview.name} />;
   return <RepositoryOverview overview={overview} />;
+}
+
+function ImportPending({ id, name, retry = false }: { readonly id: string; readonly name: string; readonly retry?: boolean }) {
+  const [busy, setBusy] = useState(false); const [error, setError] = useState<string>();
+  const start = async () => {
+    setBusy(true); setError(undefined);
+    try {
+      const response = await fetch(`/api/repositories/${id}/import`, { method: "POST", headers: { "x-ariadne-owner-id": "local-development" } });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Repository import could not start.");
+      window.location.reload();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Repository import could not start."); setBusy(false); }
+  };
+  return <section className="relative overflow-hidden rounded-[24px] border border-violet-400/15 bg-slate-900/65 p-7 sm:p-10"><p className="eyebrow">{retry ? "Analysis needs a retry" : "Repository ready to import"}</p><h1 className="page-title mt-2">{retry ? `${name} could not finish its last analysis.` : `${name} is waiting for its first analysis.`}</h1><p className="muted mt-3 max-w-xl">{retry ? "The source is still available. Retry to continue from a fresh import and analysis job." : "Ariadne has the repository record, but the source files have not been indexed yet. Start the import to unlock the overview and architecture map."}</p><button onClick={() => void start()} disabled={busy} className="mt-7 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy ? "Importing repository…" : retry ? "Retry analysis" : "Import and analyze"}</button>{error && <p className="mt-4 text-sm text-rose-300">{error}</p>}</section>;
 }
 
 function AnalysisPending({ id, name }: { readonly id: string; readonly name: string }) {

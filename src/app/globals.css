@@ -111,7 +111,8 @@ aside[style*="width"] {
   bottom: 0 !important;
 }
 @media (min-width: 1180px) {
-  .repository-workspace { padding-right: 29rem !important; }
+  .repository-workspace { transition: padding-right .24s ease; }
+  .repository-workspace[data-ai-panel-open="true"] { padding-right: calc(var(--ai-panel-width, 420px) + 2rem) !important; }
 }
 [role="dialog"] {
   justify-items: center !important;

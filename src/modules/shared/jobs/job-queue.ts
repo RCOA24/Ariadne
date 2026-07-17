@@ -201,4 +201,11 @@ export class JobWorker {
     }
     return true;
   }
+
+  /** Drains currently available work so an older queued job cannot strand a new analysis. */
+  public async runAvailable(limit = 12): Promise<void> {
+    for (let index = 0; index < limit; index += 1) {
+      if (!(await this.runOnce())) return;
+    }
+  }
 }

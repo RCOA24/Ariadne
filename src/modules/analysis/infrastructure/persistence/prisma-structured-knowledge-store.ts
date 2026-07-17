@@ -39,6 +39,8 @@ export class PrismaStructuredKnowledgeStore implements StructuredKnowledgeStore 
     performance: Readonly<Record<string, number>>,
     fingerprint?: string,
   ): Promise<void> {
+    // The default Prisma interactive-transaction timeout is 5 seconds. Bulk
+    // symbol writes can legitimately exceed that even for a modest repository.
     await prisma.$transaction(async (tx) => {
       await tx.codeRelationshipRecord.deleteMany({ where: { repositoryId: job.repositoryId } });
       if (changedFileIds.length) await tx.codeSymbolRecord.deleteMany({ where: { repositoryId: job.repositoryId, fileId: { in: [...changedFileIds] } } });
@@ -51,11 +53,13 @@ export class PrismaStructuredKnowledgeStore implements StructuredKnowledgeStore 
       await tx.analysisJobRecord.upsert({ where: { id: job.id }, create: { id: job.id, repositoryId: job.repositoryId, status: status(job.status), progress: job.progress, currentStep: job.currentStep, startedAt: job.startedAt, completedAt: job.completedAt, error: job.error }, update: { status: status(job.status), progress: job.progress, currentStep: job.currentStep, startedAt: job.startedAt, completedAt: job.completedAt, error: job.error } });
       const repository = await tx.managedRepository.findUnique({ where: { id: job.repositoryId }, select: { metadata: true } });
       const priorMetadata = (repository?.metadata as Record<string, unknown> | null) ?? {};
-      const { repositoryBriefing: _briefing, briefingFingerprint: _briefingFingerprint, ...metadataWithoutBriefing } = priorMetadata;
+      const { repositoryBriefing: _briefing, briefingFingerprint: _briefingFingerprint, repositoryOverview: _overview, overviewFingerprint: _overviewFingerprint, ...metadataWithoutBriefing } = priorMetadata;
       void _briefing;
       void _briefingFingerprint;
+      void _overview;
+      void _overviewFingerprint;
       await tx.managedRepository.update({ where: { id: job.repositoryId }, data: { metadata: { ...metadataWithoutBriefing, analysisCache: { hashes, fingerprint, analysisVersion: "15.7", parserVersion: "typescript-1", schemaVersion: "1", performance, updatedAt: new Date().toISOString() } } } });
-    });
+    }, { maxWait: 10_000, timeout: 120_000 });
   }
   public async updateJob(job: AnalysisJob): Promise<void> {
     await prisma.analysisJobRecord.upsert({
@@ -122,7 +126,7 @@ export class PrismaStructuredKnowledgeStore implements StructuredKnowledgeStore 
           error: job.error,
         },
       });
-    });
+    }, { maxWait: 10_000, timeout: 120_000 });
   }
 }
 export { prisma as analysisPrisma };

@@ -6,6 +6,9 @@ type RepositoryMetadata = {
     frameworks?: string[];
     databases?: string[];
   };
+  analysisCache?: { fingerprint?: string };
+  repositoryOverview?: RepositoryOverviewSnapshot;
+  overviewFingerprint?: string;
 };
 
 const displayName = (path: string) => path.split("/").filter(Boolean)[0] ?? "root";
@@ -54,13 +57,27 @@ export class RepositoryOverviewService {
     });
     if (!repository) return undefined;
 
-    const [files, symbols, relationships, latestAnalysis] = await Promise.all([
+    const metadata = repository.metadata as RepositoryMetadata | null;
+    const latestAnalysis = await analysisPrisma.analysisJobRecord.findFirst({ where: { repositoryId }, orderBy: { startedAt: "desc" }, select: { status: true } });
+    const analysisInProgress = latestAnalysis?.status === "RUNNING" || latestAnalysis?.status === "PENDING" || repository.status === "IMPORTING" || repository.status === "PENDING_IMPORT";
+    if (analysisInProgress) {
+      const files = await analysisPrisma.codeFileRecord.findMany({ where: { repositoryId }, select: { path: true, size: true, language: true } });
+      const languageCounts = new Map<string, number>(); const folders = new Map<string, number>();
+      files.forEach((file) => { languageCounts.set(file.language, (languageCounts.get(file.language) ?? 0) + 1); const folder = displayName(file.path); folders.set(folder, (folders.get(folder) ?? 0) + 1); });
+      const primaryLanguage = [...languageCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? metadata?.technology?.languages?.[0] ?? "Not detected";
+      const technology = [...new Set([...(metadata?.technology?.frameworks ?? []), ...(metadata?.technology?.databases ?? []), ...(metadata?.technology?.languages ?? [])])];
+      const largestFile = [...files].sort((a, b) => b.size - a.size)[0]; const largestFolder = [...folders.entries()].sort((a, b) => b[1] - a[1])[0];
+      return { id: repository.id, name: repository.name, description: repository.description ?? undefined, status: repository.status, analysisStatus: latestAnalysis?.status, primaryLanguage, framework: metadata?.technology?.frameworks?.[0], architecture: architectureStyle(files.map((file) => file.path)), technologies: technology, metrics: { "Repository size": `${(files.reduce((total, file) => total + file.size, 0) / 1024 / 1024).toFixed(1)} MB`, "Total files": files.length, Classes: 0, Functions: 0, Interfaces: 0, Methods: 0, Enums: 0, Namespaces: 0, Directories: folders.size, LOC: Math.round(files.reduce((total, file) => total + file.size, 0) / 42), Imports: 0, Dependencies: 0, "Unused files": 0, "Circular dependencies": 0, "Average complexity": 0, "Largest folder": largestFolder ? `${largestFolder[0]} (${largestFolder[1]} files)` : "—", "Largest file": largestFile?.path ?? "—" }, map: areaDefinitions.map(([name, matcher]) => ({ name, files: files.filter((file) => matcher.test(file.path)).length, folders: [...new Set(files.filter((file) => matcher.test(file.path)).map((file) => displayName(file.path)))].slice(0, 3), dependencies: 0 })).filter((area) => area.files > 0), hotspots: [], firstSteps: [{ title: "Start here", detail: "The fast file index is ready. Browse the imported files while deeper analysis continues.", href: `/repositories/${repositoryId}/files` }], };
+    }
+
+    const [files, symbols, relationships] = await Promise.all([
       analysisPrisma.codeFileRecord.findMany({ where: { repositoryId }, select: { id: true, path: true, size: true, language: true } }),
       analysisPrisma.codeSymbolRecord.findMany({ where: { repositoryId }, select: { id: true, fileId: true, kind: true, name: true, qualifiedName: true } }),
       analysisPrisma.codeRelationshipRecord.findMany({ where: { repositoryId }, select: { sourceSymbolId: true, targetSymbolId: true } }),
-      analysisPrisma.analysisJobRecord.findFirst({ where: { repositoryId }, orderBy: { startedAt: "desc" }, select: { status: true } }),
     ]);
-    const metadata = repository.metadata as RepositoryMetadata | null;
+    if (metadata?.repositoryOverview && metadata.overviewFingerprint === metadata.analysisCache?.fingerprint) {
+      return metadata.repositoryOverview;
+    }
     const paths = files.map((file) => file.path);
     const languageCounts = new Map<string, number>();
     files.forEach((file) => languageCounts.set(file.language, (languageCounts.get(file.language) ?? 0) + 1));
@@ -99,7 +116,7 @@ export class RepositoryOverviewService {
     const largestFile = [...files].sort((a, b) => b.size - a.size)[0];
     const technology = [...new Set([...(metadata?.technology?.frameworks ?? []), ...(metadata?.technology?.databases ?? []), ...(metadata?.technology?.languages ?? [])])];
     const largestFolder = [...folders.entries()].sort((a, b) => b[1] - a[1])[0];
-    return {
+    const snapshot: RepositoryOverviewSnapshot = {
       id: repository.id, name: repository.name, description: repository.description ?? undefined, status: repository.status, analysisStatus: latestAnalysis?.status,
       primaryLanguage, framework: metadata?.technology?.frameworks?.[0], architecture: architectureStyle(paths), technologies: technology,
       metrics: {
@@ -125,5 +142,10 @@ export class RepositoryOverviewService {
         { title: "Review this architecture", detail: `${architectureStyle(paths)} is the strongest detected structure signal across the repository.`, href: `/repositories/${repositoryId}/architecture` },
       ],
     };
+    await analysisPrisma.managedRepository.update({
+      where: { id: repositoryId },
+      data: { metadata: { ...(metadata ?? {}), repositoryOverview: snapshot, overviewFingerprint: metadata?.analysisCache?.fingerprint } as never },
+    });
+    return snapshot;
   }
 }

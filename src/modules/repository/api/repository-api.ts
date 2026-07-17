@@ -50,7 +50,9 @@ export const analyzeImportedRepository = async (
 export const queueImportedRepositoryAnalysis = async (repositoryId: string, ownerId: string) => {
   const queue = new JobQueue();
   const job = await queue.enqueue("code-analysis", { repositoryId, ownerId });
-  void new JobWorker(queue, [new BackgroundAnalysisProcessor()]).runOnce();
+  // Start a bounded drain: a single runOnce could claim an older job and leave
+  // this repository pending until another request happens.
+  void new JobWorker(queue, [new BackgroundAnalysisProcessor()]).runAvailable();
   return job;
 };
 export const githubInput = z.object({
