@@ -7,6 +7,7 @@ const tabs = [
   { slug: "architecture", label: "Architecture" },
   { slug: "search", label: "Search" },
   { slug: "analysis", label: "Analysis" },
+  { slug: "health", label: "Health" },
   { slug: "journey", label: "Developer Journey" },
   { slug: "chat", label: "AI Chat" },
   { slug: "settings", label: "Settings" },

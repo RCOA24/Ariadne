@@ -7,3 +7,4 @@ export * from "./search-service";
 export * from "./dashboard-service";
 export * from "./architecture-insight-service";
 export * from "./repository-overview-service";
+export * from "./repository-health-service";
