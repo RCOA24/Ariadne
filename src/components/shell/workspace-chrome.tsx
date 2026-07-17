@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type SearchResult = { id: string; type: string; title: string; subtitle: string; repositoryId: string };
 type Recent = { href: string; label: string };
-const labelFor = (segment: string) => ({ repositories: "Repositories", knowledge: "Knowledge", architecture: "Architecture", journey: "Developer Journey", health: "Health", files: "Files", chat: "AI Chat", analysis: "Analysis", settings: "Settings", search: "Search" }[segment] ?? segment);
+const labelFor = (segment: string) => (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(segment) ? "Repository" : ({ repositories: "Repositories", knowledge: "Knowledge", architecture: "Architecture", journey: "Developer Journey", health: "Health", files: "Files", chat: "AI Chat", analysis: "Analysis", settings: "Settings", search: "Search" }[segment] ?? segment));
 export function WorkspaceChrome() {
   const path = usePathname(); const router = useRouter(); const [open, setOpen] = useState(false); const [query, setQuery] = useState(""); const [results, setResults] = useState<SearchResult[]>([]); const [active, setActive] = useState(0); const [recents, setRecents] = useState<Recent[]>([]); const [light, setLight] = useState(false);
   const crumbs = useMemo(() => path.split("/").filter(Boolean).map((segment, index, all) => ({ label: labelFor(segment), href: `/${all.slice(0, index + 1).join("/")}` })), [path]);

@@ -20,7 +20,7 @@ export function RepositoryTabs({
   const path = usePathname();
   const base = `/repositories/${repositoryId}`;
   return (
-    <nav className="mt-7 flex gap-1 overflow-x-auto border-b border-slate-800">
+    <nav className="repository-tabs-scroll mt-7 flex gap-1 overflow-x-auto border-b border-slate-800">
       {tabs.map((tab) => {
         const href = tab.slug ? `${base}/${tab.slug}` : base;
         const active = path === href;

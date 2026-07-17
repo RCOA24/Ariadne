@@ -20,7 +20,7 @@ const items = [
 export function ApplicationNavigation() {
   const path = usePathname();
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-white/[.06] bg-[#0c1224]/80 p-5 backdrop-blur-xl md:block">
+    <aside className="app-navigation sticky top-0 hidden h-screen w-64 shrink-0 border-r border-white/[.06] bg-[#0c1224]/80 p-5 backdrop-blur-xl md:block">
       <Link
         href="/"
         className="mb-10 flex items-center gap-3 px-2 text-lg font-semibold text-white"

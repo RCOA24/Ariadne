@@ -8,8 +8,8 @@
   color-scheme: dark;
 }
 [data-theme="light"] {
-  --bg: #eef3fb;
-  --surface: #ffffff;
+  --bg: #edf2f8;
+  --surface: #f9fbfe;
   color-scheme: light;
 }
 * {
@@ -44,8 +44,94 @@ body {
     sans-serif;
 }
 [data-theme="light"] body {
-  color: #0f172a;
-  background: radial-gradient(circle at 84% -10%, rgba(124, 92, 252, 0.13), transparent 35rem), var(--bg);
+  color: #172033;
+  background:
+    radial-gradient(circle at 82% -10%, rgba(124, 92, 252, 0.11), transparent 34rem),
+    radial-gradient(circle at -10% 42%, rgba(45, 212, 191, 0.08), transparent 30rem),
+    var(--bg);
+}
+[data-theme="light"] .ariadne-panel {
+  background: rgba(250, 252, 255, 0.94);
+  border-color: #dbe4f0;
+  box-shadow: 0 14px 34px rgba(35, 49, 74, 0.08);
+}
+[data-theme="light"] [class*="bg-slate-950"],
+[data-theme="light"] [class*="bg-slate-900"] {
+  background-color: #f8fafd !important;
+}
+[data-theme="light"] [class*="bg-slate-800"] { background-color: #e9eef5 !important; }
+[data-theme="light"] [class*="bg-white/"] { background-color: rgba(226, 232, 240, 0.42) !important; }
+[data-theme="light"] [class*="text-white"],
+[data-theme="light"] [class*="text-slate-50"],
+[data-theme="light"] [class*="text-slate-100"],
+[data-theme="light"] [class*="text-slate-200"] {
+  color: #172033 !important;
+}
+[data-theme="light"] [class*="text-slate-300"] { color: #334155 !important; }
+[data-theme="light"] [class*="text-slate-400"],
+[data-theme="light"] [class*="text-slate-500"] { color: #5f718d !important; }
+[data-theme="light"] [class*="text-slate-600"],
+[data-theme="light"] [class*="text-slate-700"] { color: #475569 !important; }
+[data-theme="light"] [class*="border-slate-"] { border-color: #c9d5e4 !important; }
+[data-theme="light"] [class*="border-white/"] { border-color: rgba(100, 116, 139, 0.16) !important; }
+[data-theme="light"] .app-navigation {
+  background: linear-gradient(180deg, #f8fafd 0%, #eef3f9 100%) !important;
+  border-color: #dbe4f0 !important;
+  box-shadow: 14px 0 35px rgba(35, 49, 74, 0.04);
+}
+[data-theme="light"] [class*="bg-[#0b1020]"] { background: rgba(255, 255, 255, 0.86) !important; }
+[data-theme="light"] [role="dialog"] > section { background: #ffffff !important; border-color: #d8cfff !important; }
+[data-theme="light"] [role="dialog"] { background: rgba(15, 23, 42, .22) !important; }
+[data-theme="light"] aside[style*="width"] {
+  background: rgba(248, 250, 253, .98) !important;
+  border-color: #dbe4f0 !important;
+}
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  color: #172033 !important;
+  background-color: #fdfefe !important;
+  border-color: #c9d5e4 !important;
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder { color: #94a3b8 !important; }
+[data-theme="light"] .page-title { color: #172033 !important; }
+[data-theme="light"] .muted { color: #5f718d !important; }
+[data-theme="light"] .eyebrow { color: #0891b2 !important; }
+[data-theme="light"] * { scrollbar-color: rgba(100, 116, 139, .55) transparent; }
+[data-theme="light"] .repository-tabs-scroll { scrollbar-color: #0891b2 rgba(203, 213, 225, .7); }
+[data-theme="light"] .repository-tabs-scroll::-webkit-scrollbar-track { background: rgba(203, 213, 225, .7); }
+[data-theme="light"] .repository-tabs-scroll::-webkit-scrollbar-thumb { border-color: rgba(203, 213, 225, .7); }
+[data-theme="light"] [class*="text-violet-200"] { color: #5b3fa1 !important; }
+[data-theme="light"] [class*="text-violet-300"] { color: #6d4fb3 !important; }
+[data-theme="light"] [class*="text-cyan-300"] { color: #087e9a !important; }
+[data-theme="light"] [class*="text-cyan-200"] { color: #0e7490 !important; }
+aside[style*="width"] {
+  top: 3.75rem !important;
+  bottom: 0 !important;
+}
+@media (min-width: 1180px) {
+  .repository-workspace { padding-right: 29rem !important; }
+}
+[role="dialog"] {
+  justify-items: center !important;
+  align-content: start !important;
+  padding-top: min(14dvh, 8rem) !important;
+}
+[role="dialog"] > section { width: min(42rem, calc(100vw - 2rem)) !important; }
+aside[style*="width"] { transition: width .2s ease, transform .25s ease; }
+@media (max-width: 767px) {
+  aside[style*="width"] {
+    width: 100% !important;
+    top: auto !important;
+    height: min(78dvh, 46rem);
+    border-left: 0;
+    border-top: 1px solid rgba(124, 92, 252, .22);
+    border-radius: 1.5rem 1.5rem 0 0;
+    box-shadow: 0 -20px 50px rgba(0, 0, 0, .28);
+  }
+  aside[style*="width"] > .explain-resize-handle,
+  aside[style*="width"] > button:first-child { display: none; }
 }
 code,
 pre,
@@ -56,6 +142,27 @@ button,
 a {
   -webkit-tap-highlight-color: transparent;
 }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.55) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.55);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.8); background-clip: padding-box; }
+.repository-tabs-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.55) rgba(15, 23, 42, 0.42);
+  scrollbar-gutter: stable;
+}
+.repository-tabs-scroll::-webkit-scrollbar { height: 7px; }
+.repository-tabs-scroll::-webkit-scrollbar-track { margin: 0 8px; border-radius: 999px; background: rgba(15, 23, 42, 0.42); }
+.repository-tabs-scroll::-webkit-scrollbar-thumb { border: 1px solid rgba(15, 23, 42, 0.42); background: linear-gradient(90deg, #22d3ee, #8b5cf6); background-clip: padding-box; }
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
