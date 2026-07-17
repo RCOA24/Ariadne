@@ -3,13 +3,17 @@ import cytoscape, { type Core, type EdgeSingular } from "cytoscape";
 import {
   Focus,
   Maximize2,
+  Pause,
+  Play,
   RotateCcw,
   Route,
   Search,
+  SkipBack,
+  SkipForward,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 type Graph = {
   nodes: { id: string; label: string; kind: string; layer: string }[];
   edges: { id: string; source: string; target: string; kind: string }[];
@@ -35,6 +39,22 @@ export function ArchitectureVisualization({
   );
   const [selected, setSelected] = useState<Graph["nodes"][number]>();
   const [threading, setThreading] = useState(false);
+  const [storyIndex, setStoryIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const story = useMemo(() => {
+    if (!data?.nodes.length) return [] as { node: Graph["nodes"][number]; edge?: Graph["edges"][number] }[];
+    const start = selected ?? [...data.nodes].sort((left, right) => data.edges.filter((edge) => edge.source === right.id).length - data.edges.filter((edge) => edge.source === left.id).length)[0];
+    const steps: { node: Graph["nodes"][number]; edge?: Graph["edges"][number] }[] = [{ node: start }];
+    const seen = new Set([start.id]); let current = start.id;
+    for (let index = 0; index < 6; index += 1) {
+      const edge = data.edges.find((candidate) => candidate.source === current && !seen.has(candidate.target));
+      if (!edge) break;
+      const node = data.nodes.find((candidate) => candidate.id === edge.target);
+      if (!node) break;
+      steps.push({ node, edge }); seen.add(node.id); current = node.id;
+    }
+    return steps;
+  }, [data, selected]);
   useEffect(() => {
     fetch(`/api/repositories/${repositoryId}/architecture?limit=500`).then(
       async (response) => response.ok && setData(await response.json()),
@@ -85,6 +105,15 @@ export function ArchitectureVisualization({
             opacity: 1,
           },
         },
+        { selector: ".story-fade", style: { opacity: 0.1 } },
+        {
+          selector: "node.story-active",
+          style: { "background-color": "#2dd4bf", width: 38, height: 38, opacity: 1 },
+        },
+        {
+          selector: "edge.story-edge",
+          style: { "line-color": "#2dd4bf", "target-arrow-color": "#2dd4bf", width: 5, opacity: 1 },
+        },
       ],
       layout: {
         name: layout,
@@ -122,6 +151,24 @@ export function ArchitectureVisualization({
         duration: 300,
       });
   }, [query]);
+  useEffect(() => { setStoryIndex(0); setPlaying(false); }, [story]);
+  useEffect(() => {
+    if (!playing || storyIndex >= story.length - 1) { if (storyIndex >= story.length - 1) setPlaying(false); return; }
+    const timer = window.setTimeout(() => setStoryIndex((value) => value + 1), 1800);
+    return () => window.clearTimeout(timer);
+  }, [playing, storyIndex, story.length]);
+  useEffect(() => {
+    const graph = cy.current; const step = story[storyIndex];
+    if (!graph || !step) return;
+    graph.elements().removeClass("story-active story-edge story-fade");
+    graph.elements().addClass("story-fade");
+    const ids = story.slice(0, storyIndex + 1).map((item) => item.node.id);
+    const active = graph.nodes().filter((node) => ids.includes(node.id()));
+    active.removeClass("story-fade").addClass("story-active");
+    const edges = active.connectedEdges().filter((edge) => ids.includes(edge.source().id()) && ids.includes(edge.target().id()));
+    edges.removeClass("story-fade").addClass("story-edge");
+    graph.animate({ fit: { eles: active.union(edges), padding: 110 }, duration: 500 });
+  }, [story, storyIndex]);
   const reveal = () => {
     const graph = cy.current;
     if (!graph || !selected) return;
@@ -181,6 +228,26 @@ export function ArchitectureVisualization({
           <option value="concentric">Radial</option>
         </select>
       </div>
+      <section className="mt-4 overflow-hidden rounded-2xl border border-cyan-300/15 bg-gradient-to-r from-cyan-300/[.07] via-slate-900/60 to-violet-400/[.08] p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="eyebrow">Architecture story mode</p>
+            {story.length ? (
+              <>
+                <h2 className="mt-1 text-lg font-semibold text-slate-50">{storyIndex === 0 ? `The story begins at ${story[0].node.label}.` : `${story[storyIndex - 1].node.label} ${story[storyIndex].edge?.kind ?? "connects to"} ${story[storyIndex].node.label}.`}</h2>
+                <p className="mt-1 text-sm text-slate-400">Step {storyIndex + 1} of {story.length} · verified architecture evidence</p>
+              </>
+            ) : <p className="mt-1 text-sm text-slate-500">Analyze this repository to create a narrated architecture path.</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => { setStoryIndex(0); setPlaying(false); }} disabled={!story.length} className="rounded-lg border border-white/10 p-2 text-slate-300 disabled:opacity-40" aria-label="Replay story"><RotateCcw className="size-4" /></button>
+            <button onClick={() => setStoryIndex((value) => Math.max(0, value - 1))} disabled={!story.length || storyIndex === 0} className="rounded-lg border border-white/10 p-2 text-slate-300 disabled:opacity-40" aria-label="Previous step"><SkipBack className="size-4" /></button>
+            <button onClick={() => setPlaying((value) => !value)} disabled={story.length < 2} className="rounded-lg bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40">{playing ? <><Pause className="mr-1 inline size-4" />Pause</> : <><Play className="mr-1 inline size-4" />Play</>}</button>
+            <button onClick={() => setStoryIndex((value) => Math.min(story.length - 1, value + 1))} disabled={!story.length || storyIndex === story.length - 1} className="rounded-lg border border-white/10 p-2 text-slate-300 disabled:opacity-40" aria-label="Next step"><SkipForward className="size-4" /></button>
+          </div>
+        </div>
+        <div className="mt-4 flex gap-1">{story.map((item, index) => <button key={item.node.id} onClick={() => setStoryIndex(index)} className={`h-1.5 flex-1 rounded-full transition ${index <= storyIndex ? "bg-cyan-300 shadow-[0_0_10px_rgba(45,212,191,.7)]" : "bg-slate-700"}`} aria-label={`Story step ${index + 1}: ${item.node.label}`} />)}</div>
+      </section>
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_280px]">
         <section className="ariadne-panel relative overflow-hidden">
           <div
