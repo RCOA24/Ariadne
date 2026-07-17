@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
+import { availableParallelism } from "node:os";
 import ts from "typescript";
 
 import {
@@ -22,12 +23,53 @@ export interface StructuredKnowledgeStore {
     relationships: readonly CodeRelationship[],
   ): Promise<void>;
   updateJob(job: AnalysisJob): Promise<void>;
+  saveIndex?(job: AnalysisJob, files: readonly CodeFile[]): Promise<void>;
+  loadCache?(repositoryId: string): Promise<Readonly<Record<string, string>>>;
+  loadSymbols?(repositoryId: string): Promise<readonly CodeSymbol[]>;
+  saveIncremental?(
+    job: AnalysisJob,
+    files: readonly CodeFile[],
+    symbols: readonly CodeSymbol[],
+    relationships: readonly CodeRelationship[],
+    changedFileIds: readonly string[],
+    hashes: Readonly<Record<string, string>>,
+    performance: Readonly<Record<string, number>>,
+    fingerprint?: string,
+  ): Promise<void>;
 }
 
 const stableId = (value: string) =>
   createHash("sha256").update(value).digest("hex").slice(0, 24);
 
 const supportedScriptExtensions = new Set([".ts", ".tsx", ".js", ".jsx"]);
+
+/**
+ * Makes the first useful symbols available first.  The shared cursor in the
+ * worker pool acts as a work-stealing queue: a free worker always claims the
+ * next highest-value file instead of waiting for a pre-assigned batch.
+ */
+const analysisPriority = (file: CodeFile): number => {
+  const path = file.path.toLowerCase();
+  if (/(controller|route|\/api\/|service|repository|\/application\/|\/domain\/)/.test(path)) return 100;
+  if (/(component|\/ui\/|util|shared|common|\/lib\/)/.test(path)) return 50;
+  if (/(test|spec|fixture|generated|config|readme|docs?)/.test(path)) return 5;
+  return 25;
+};
+
+class AnalysisWorkerPool {
+  public async map<T, R>(items: readonly T[], work: (item: T) => Promise<R>): Promise<readonly R[]> {
+    const results: R[] = new Array(items.length);
+    let cursor = 0;
+    const workers = Array.from({ length: Math.max(1, Math.min(availableParallelism(), 8, items.length || 1)) }, async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        results[index] = await work(items[index]);
+      }
+    });
+    await Promise.all(workers);
+    return results;
+  }
+}
 
 export class LanguageAnalyzer {
   public detect(extension: string): string {
@@ -65,18 +107,21 @@ export class CSharpAnalyzer {
 }
 
 export class TypeScriptAnalyzer {
+  private readonly astCache = new Map<string, ts.SourceFile>();
   public extract(
     repositoryId: string,
     file: CodeFile,
     content: string,
   ): readonly CodeSymbol[] {
-    const sourceFile = ts.createSourceFile(
+    const cacheKey = `${file.id}:${stableId(content)}:typescript-1`;
+    const sourceFile = this.astCache.get(cacheKey) ?? ts.createSourceFile(
       file.path,
       content,
       ts.ScriptTarget.Latest,
       true,
       this.scriptKind(file.extension),
     );
+    this.astCache.set(cacheKey, sourceFile);
     const symbols: CodeSymbol[] = [];
 
     const addSymbol = (
@@ -179,6 +224,7 @@ export class AnalysisOrchestrator {
   public async execute(
     repositoryId: string,
     workspace: string,
+    controls?: { readonly reportProgress: (progress: number, message: string) => Promise<void>; readonly isCancelled: () => Promise<boolean> },
   ): Promise<AnalysisJob> {
     let job = new AnalysisJob(
       randomUUID(),
@@ -189,40 +235,43 @@ export class AnalysisOrchestrator {
       new Date(),
     );
     await this.store.updateJob(job);
+    await controls?.reportProgress(5, "Repository discovery started");
 
     try {
+      const discoveredAt = performance.now();
       const scanned = await this.scanner.scan(workspace);
+      if (await controls?.isCancelled()) return job;
       const files = scanned.map((file) => this.file(repositoryId, file));
+      job = new AnalysisJob(job.id, repositoryId, "running", 18, "Fast file index ready", job.startedAt);
+      if (this.store.saveIndex) await this.store.saveIndex(job, files); else await this.store.updateJob(job);
+      await controls?.reportProgress(22, "Fast index ready — repository is available");
       const contents = await this.readContents(workspace, files);
-
-      job = new AnalysisJob(
-        job.id,
-        repositoryId,
-        "running",
-        30,
-        "Symbol extraction",
-        job.startedAt,
-      );
+      const hashes = Object.fromEntries([...contents.entries()].map(([id, content]) => [files.find((file) => file.id === id)!.path, stableId(content)]));
+      const fingerprint = stableId(Object.entries(hashes).sort(([a], [b]) => a.localeCompare(b)).map(([path, hash]) => `${path}:${hash}`).join("|"));
+      const cached = this.store.loadCache ? await this.store.loadCache(repositoryId) : {};
+      const changed = files.filter((file) => cached[file.path] !== hashes[file.path]).map((file) => file.id);
+      const removed = Object.keys(cached).filter((path) => !hashes[path]).map((path) => stableId(`${repositoryId}:${path}`));
+      const changedFileIds = [...new Set([...changed, ...removed])];
+      if (!changedFileIds.length && Object.keys(cached).length) {
+        job = new AnalysisJob(job.id, repositoryId, "completed", 100, "No changed files — cached analysis reused", job.startedAt, new Date());
+        await this.store.updateJob(job);
+        await controls?.reportProgress(100, "Cached analysis reused");
+        return job;
+      }
+      job = new AnalysisJob(job.id, repositoryId, "running", 40, `Deep analysis (${changed.length || files.length} changed files)`, job.startedAt);
       await this.store.updateJob(job);
-
-      const symbols = this.extractSymbols(repositoryId, files, contents);
-
-      job = new AnalysisJob(
-        job.id,
-        repositoryId,
-        "running",
-        75,
-        "Relationship mapping",
-        job.startedAt,
-      );
+      await controls?.reportProgress(45, "Deep symbol analysis in progress");
+      const changedSet = new Set(changed);
+      const prior = this.store.loadSymbols ? await this.store.loadSymbols(repositoryId) : [];
+      const scheduledFiles = files
+        .filter((file) => changedSet.has(file.id) || !Object.keys(cached).length)
+        .sort((left, right) => analysisPriority(right) - analysisPriority(left) || left.path.localeCompare(right.path));
+      const extracted = this.extractSymbols(repositoryId, scheduledFiles, contents);
+      const symbols = [...(Object.keys(cached).length ? prior.filter((symbol) => !changedFileIds.includes(symbol.fileId)) : []), ...extracted];
+      job = new AnalysisJob(job.id, repositoryId, "running", 76, "Refreshing dependency graph", job.startedAt);
       await this.store.updateJob(job);
-
-      const relationships = this.relationships(
-        repositoryId,
-        files,
-        contents,
-        symbols,
-      );
+      await controls?.reportProgress(78, "Refreshing knowledge graph");
+      const relationships = this.relationships(repositoryId, files, contents, symbols);
       job = new AnalysisJob(
         job.id,
         repositoryId,
@@ -232,7 +281,10 @@ export class AnalysisOrchestrator {
         job.startedAt,
         new Date(),
       );
-      await this.store.save(job, files, symbols, relationships);
+      const metrics = { discoveryMs: Math.round(performance.now() - discoveredAt), filesIndexed: files.length, filesAnalyzed: changed.length || files.length, filesSkipped: Math.max(0, files.length - changed.length), cacheHitRate: files.length ? Math.round(((files.length - changed.length) / files.length) * 100) : 0, graphRelationships: relationships.length };
+      if (this.store.saveIncremental) await this.store.saveIncremental(job, files, extracted, relationships, changedFileIds, hashes, metrics, fingerprint);
+      else await this.store.save(job, files, symbols, relationships);
+      await controls?.reportProgress(100, "Analysis complete");
       return job;
     } catch (error) {
       job = new AnalysisJob(
@@ -254,11 +306,12 @@ export class AnalysisOrchestrator {
     workspace: string,
     files: readonly CodeFile[],
   ): Promise<ReadonlyMap<string, string>> {
-    const contentEntries = await Promise.all(
-      files.map(async (file) => {
+    const contentEntries = await new AnalysisWorkerPool().map(
+      files,
+      async (file) => {
         const content = await readFile(resolve(workspace, file.path), "utf8");
         return [file.id, content] as const;
-      }),
+      },
     );
     return new Map(contentEntries);
   }

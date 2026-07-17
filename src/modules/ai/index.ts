@@ -6,6 +6,7 @@ export * from "./application/intelligence-orchestrator";
 export * from "./domain/ai-provider";
 export * from "./domain/ai-session";
 export * from "./application/context-builder";
+export * from "./application/context-intelligence-engine";
 export * from "./application/prompt-builder";
 export * from "./application/grounded-streaming-service";
 export * from "./infrastructure/ai-provider-factory";

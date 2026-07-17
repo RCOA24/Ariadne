@@ -11,6 +11,8 @@ import {
 import { RepositoryImportService } from "../application/services/repository-import-service";
 import { AnalysisOrchestrator } from "../../analysis/application/analysis-orchestrator";
 import { PrismaStructuredKnowledgeStore } from "../../analysis/infrastructure/persistence/prisma-structured-knowledge-store";
+import { BackgroundAnalysisProcessor } from "../../analysis/infrastructure/background-analysis-processor";
+import { JobQueue, JobWorker } from "../../shared/jobs/job-queue";
 
 export const ownerIdFrom = (request: Request) =>
   request.headers.get("x-ariadne-owner-id")?.trim() || "local-development";
@@ -44,6 +46,12 @@ export const analyzeImportedRepository = async (
     repositoryId,
     workspace,
   );
+};
+export const queueImportedRepositoryAnalysis = async (repositoryId: string, ownerId: string) => {
+  const queue = new JobQueue();
+  const job = await queue.enqueue("code-analysis", { repositoryId, ownerId });
+  void new JobWorker(queue, [new BackgroundAnalysisProcessor()]).runOnce();
+  return job;
 };
 export const githubInput = z.object({
   githubUrl: z.string().url(),

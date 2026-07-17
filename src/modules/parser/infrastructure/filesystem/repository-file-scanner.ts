@@ -10,8 +10,10 @@ const ignoredDirectoryNames = new Set([
   "coverage",
   ".next",
   ".git",
+  ".cache",
   "bin",
   "obj",
+  "out",
   "vendor",
   "target"
 ]);
@@ -34,7 +36,7 @@ export class RepositoryFileScanner {
           continue;
         }
 
-        if (!entry.isFile()) continue;
+        if (!entry.isFile() || entry.name.endsWith(".min.js") || entry.name.endsWith(".map")) continue;
         const language = Language.fromExtension(path.extname(entry.name));
         if (language === undefined) continue;
 

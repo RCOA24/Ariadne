@@ -58,6 +58,9 @@ const ignored = new Set([
   ".git",
   "dist",
   "build",
+  "coverage",
+  ".cache",
+  "out",
 ]);
 const languageByExtension: Readonly<Record<string, string>> = {
   ".cs": "C#",
@@ -77,6 +80,7 @@ export class RepositoryScanner {
         if (entry.isDirectory()) {
           if (!ignored.has(entry.name)) await walk(join(directory, entry.name));
         } else if (entry.isFile()) {
+          if (entry.name.endsWith(".min.js") || entry.name.endsWith(".map")) continue;
           const absolute = join(directory, entry.name);
           const extension = extname(entry.name).toLowerCase();
           files.push(

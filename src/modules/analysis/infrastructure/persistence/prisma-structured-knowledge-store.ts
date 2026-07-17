@@ -17,6 +17,46 @@ const status = (value: AnalysisJob["status"]): AnalysisJobStatus =>
   value.toUpperCase() as AnalysisJobStatus;
 
 export class PrismaStructuredKnowledgeStore implements StructuredKnowledgeStore {
+  public async loadSymbols(repositoryId: string): Promise<readonly CodeSymbol[]> {
+    return prisma.codeSymbolRecord.findMany({ where: { repositoryId }, select: { id: true, repositoryId: true, fileId: true, kind: true, name: true, qualifiedName: true, line: true } }) as Promise<readonly CodeSymbol[]>;
+  }
+  public async saveIndex(job: AnalysisJob, files: readonly CodeFile[]): Promise<void> {
+    if (files.length) await prisma.codeFileRecord.createMany({ data: [...files], skipDuplicates: true });
+    await this.updateJob(job);
+  }
+  public async loadCache(repositoryId: string): Promise<Readonly<Record<string, string>>> {
+    const repository = await prisma.managedRepository.findUnique({ where: { id: repositoryId }, select: { metadata: true } });
+    const metadata = repository?.metadata as { analysisCache?: { hashes?: Record<string, string> } } | null;
+    return metadata?.analysisCache?.hashes ?? {};
+  }
+  public async saveIncremental(
+    job: AnalysisJob,
+    files: readonly CodeFile[],
+    symbols: readonly CodeSymbol[],
+    relationships: readonly CodeRelationship[],
+    changedFileIds: readonly string[],
+    hashes: Readonly<Record<string, string>>,
+    performance: Readonly<Record<string, number>>,
+    fingerprint?: string,
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.codeRelationshipRecord.deleteMany({ where: { repositoryId: job.repositoryId } });
+      if (changedFileIds.length) await tx.codeSymbolRecord.deleteMany({ where: { repositoryId: job.repositoryId, fileId: { in: [...changedFileIds] } } });
+      if (changedFileIds.length) await tx.codeFileRecord.deleteMany({ where: { repositoryId: job.repositoryId, id: { in: [...changedFileIds] } } });
+      const changed = new Set(changedFileIds);
+      const changedFiles = files.filter((file) => changed.has(file.id));
+      if (changedFiles.length) await tx.codeFileRecord.createMany({ data: changedFiles });
+      if (symbols.length) await tx.codeSymbolRecord.createMany({ data: [...symbols] });
+      if (relationships.length) await tx.codeRelationshipRecord.createMany({ data: [...relationships] });
+      await tx.analysisJobRecord.upsert({ where: { id: job.id }, create: { id: job.id, repositoryId: job.repositoryId, status: status(job.status), progress: job.progress, currentStep: job.currentStep, startedAt: job.startedAt, completedAt: job.completedAt, error: job.error }, update: { status: status(job.status), progress: job.progress, currentStep: job.currentStep, startedAt: job.startedAt, completedAt: job.completedAt, error: job.error } });
+      const repository = await tx.managedRepository.findUnique({ where: { id: job.repositoryId }, select: { metadata: true } });
+      const priorMetadata = (repository?.metadata as Record<string, unknown> | null) ?? {};
+      const { repositoryBriefing: _briefing, briefingFingerprint: _briefingFingerprint, ...metadataWithoutBriefing } = priorMetadata;
+      void _briefing;
+      void _briefingFingerprint;
+      await tx.managedRepository.update({ where: { id: job.repositoryId }, data: { metadata: { ...metadataWithoutBriefing, analysisCache: { hashes, fingerprint, analysisVersion: "15.7", parserVersion: "typescript-1", schemaVersion: "1", performance, updatedAt: new Date().toISOString() } } } });
+    });
+  }
   public async updateJob(job: AnalysisJob): Promise<void> {
     await prisma.analysisJobRecord.upsert({
       where: { id: job.id },
