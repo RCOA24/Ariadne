@@ -10,7 +10,7 @@ export interface Settings {
     readonly locale: string;
   };
   readonly ai: {
-    readonly provider?: "openai" | "anthropic" | "gemini" | "ollama";
+    readonly provider?: "groq" | "openai" | "anthropic" | "gemini" | "ollama";
     readonly model?: string;
     readonly temperature: number;
     readonly maxTokens: number;
