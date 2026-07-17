@@ -6,3 +6,4 @@ export * from "./architecture-visualization-analyzer";
 export * from "./search-service";
 export * from "./dashboard-service";
 export * from "./architecture-insight-service";
+export * from "./repository-overview-service";
