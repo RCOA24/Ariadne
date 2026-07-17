@@ -7,6 +7,11 @@
   --surface: #1a2238;
   color-scheme: dark;
 }
+[data-theme="light"] {
+  --bg: #eef3fb;
+  --surface: #ffffff;
+  color-scheme: light;
+}
 * {
   box-sizing: border-box;
 }
@@ -37,6 +42,10 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+}
+[data-theme="light"] body {
+  color: #0f172a;
+  background: radial-gradient(circle at 84% -10%, rgba(124, 92, 252, 0.13), transparent 35rem), var(--bg);
 }
 code,
 pre,
@@ -83,6 +92,13 @@ select:focus-visible {
   main {
     animation: ariadne-enter 0.32s ease-out;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+@supports (view-transition-name: none) {
+  main { view-transition-name: ariadne-page; }
+  ::view-transition-old(ariadne-page), ::view-transition-new(ariadne-page) { animation-duration: .22s; }
 }
 @keyframes ariadne-enter {
   from {

@@ -8,6 +8,7 @@ import {
   Network,
   Search,
   Sparkles,
+  Star,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -58,6 +59,7 @@ export function KnowledgeExplorer({
   const [error, setError] = useState<string>();
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [loadingSymbols, setLoadingSymbols] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   const loadFiles = useCallback(
     async (cursor?: string) => {
@@ -110,6 +112,18 @@ export function KnowledgeExplorer({
   useEffect(() => {
     void loadFiles();
   }, [loadFiles]);
+
+  useEffect(() => {
+    setFavorites(JSON.parse(localStorage.getItem(`ariadne:favorites:${repositoryId}`) ?? "[]") as string[]);
+  }, [repositoryId]);
+
+  const toggleFavorite = (symbol: SymbolItem) => {
+    setFavorites((current) => {
+      const next = current.includes(symbol.id) ? current.filter((id) => id !== symbol.id) : [...current, symbol.id];
+      localStorage.setItem(`ariadne:favorites:${repositoryId}`, JSON.stringify(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     setDetail(undefined);
@@ -274,6 +288,13 @@ export function KnowledgeExplorer({
                   <span className="mt-3 inline-flex rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-300">
                     {detail.kind}
                   </span>
+                  <button
+                    onClick={() => toggleFavorite(detail)}
+                    className={`ml-2 inline-flex rounded-full px-2.5 py-1 text-xs transition ${favorites.includes(detail.id) ? "bg-amber-300/15 text-amber-200" : "bg-slate-800 text-slate-400 hover:text-amber-200"}`}
+                  >
+                    <Star className={`mr-1 size-3 ${favorites.includes(detail.id) ? "fill-current" : ""}`} />
+                    {favorites.includes(detail.id) ? "Saved" : "Save symbol"}
+                  </button>
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
