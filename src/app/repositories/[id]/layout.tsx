@@ -1,4 +1,5 @@
 import { RepositoryTabs } from "@/components/repositories/repository-tabs";
+import { RepositoryExplainPanel } from "@/components/repositories/repository-explain-panel";
 export default async function RepositoryLayout({
   children,
   params,
@@ -11,6 +12,7 @@ export default async function RepositoryLayout({
       </p>
       <RepositoryTabs repositoryId={id} />
       {children}
+      <RepositoryExplainPanel repositoryId={id} />
     </main>
   );
 }

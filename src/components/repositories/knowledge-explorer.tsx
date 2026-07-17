@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 type FileItem = { id: string; path: string; language: string; size: number };
 type SymbolItem = {
@@ -46,6 +47,7 @@ export function KnowledgeExplorer({
 }: {
   readonly repositoryId: string;
 }) {
+  const searchParams = useSearchParams();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
   const [fileCursor, setFileCursor] = useState<string>();
@@ -114,12 +116,17 @@ export function KnowledgeExplorer({
     void loadSymbols(undefined, kind);
   }, [kind, loadSymbols]);
 
-  const select = async (id: string) => {
+  const select = useCallback(async (id: string) => {
     const response = await fetch(
       `/api/repositories/${repositoryId}/knowledge/symbols/${id}`,
     );
     if (response.ok) setDetail(await response.json());
-  };
+  }, [repositoryId]);
+
+  useEffect(() => {
+    const symbolId = searchParams.get("symbol");
+    if (symbolId) void select(symbolId);
+  }, [searchParams, select]);
 
   const visibleSymbols = symbols.filter((symbol) =>
     `${symbol.name} ${symbol.qualifiedName}`
